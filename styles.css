@@ -16,6 +16,37 @@ h1 { margin: 0 0 10px; font-weight: 600; font-size: 1.9rem; color: #0f172a; }
     border-left: 4px solid #3b82f6; padding-left: 18px;
 }
 
+/* Affordability Check */
+.affordability-check {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px solid #dee2e6;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 24px;
+    position: relative;
+}
+
+.affordability-check h4 {
+    margin: 0 0 12px;
+    color: #495057;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.affordability-check .control-group {
+    margin-bottom: 12px;
+}
+
+#affordabilityResult {
+    border-radius: 8px;
+    font-size: 0.95em;
+    line-height: 1.4;
+    transition: all 0.3s ease;
+    padding: 10px;
+}
+
 /* Layout */
 .dashboard { display: flex; gap: 28px; flex-wrap: wrap; }
 .controls { flex: 1 1 360px; background: #f8fafc; border-radius: 20px; padding: 20px; }

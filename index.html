@@ -30,6 +30,20 @@
         <div class="controls">
             <h3 style="margin:0 0 14px;">Параметры</h3>
 
+            <!-- Блок проверки доступности -->
+            <div class="affordability-check" style="background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px; color: #495057;">💰 Проверка доступности кредита</h4>
+                
+                <div class="control-group">
+                    <label>Ежемесячный доход для сбережений <span class="value-display" id="savingsVal">400 тыс</span></label>
+                    <input type="range" id="savingsMonthly" min="0" max="1000" value="400" step="10">
+                </div>
+                
+                <div id="affordabilityResult" style="margin-top: 10px; padding: 10px; border-radius: 5px;">
+                    <!-- Результат проверки доступности -->
+                </div>
+            </div>
+
             <div class="control-group">
                 <label>Рыночная цена новой квартиры <span class="value-display" id="p0Val">50 млн</span></label>
                 <input type="range" id="p0" min="30" max="80" value="50" step="1">
@@ -86,10 +100,6 @@
             <div class="control-group">
                 <label>Горизонт планирования <span class="value-display" id="TVal">5 лет</span></label>
                 <input type="range" id="T" min="3" max="10" value="5" step="1">
-            </div>
-            <div class="control-group">
-                <label>Ежемес. сбережения без ипотеки <span class="value-display" id="savingsVal">400 тыс</span></label>
-                <input type="range" id="savings" min="0" max="1000" value="400" step="10">
             </div>
 
             <hr>

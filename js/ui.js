@@ -2,7 +2,7 @@
 
 (function() {
 
-var INPUT_IDS = ['p0', 'discount', 'equity', 'l1', 'repair', 'g_new', 'g_old', 'r', 't1', 'T', 's0', 'i2', 'savings'];
+var INPUT_IDS = ['savingsMonthly', 'p0', 'discount', 'equity', 'l1', 'repair', 'g_new', 'g_old', 'r', 't1', 'T', 's0', 'i2'];
 
 // ─── Объяснения показателей (открываются по кнопке ?) ────────────────────────
 
@@ -116,7 +116,7 @@ function getValues() {
         i2:             +document.getElementById('i2').value / 100,
         i1:             0.06,
         repayL1Early:   document.getElementById('repayL1Early').checked,
-        savingsMonthly: +document.getElementById('savings').value / 1000,
+        savingsMonthly: +document.getElementById('savingsMonthly').value / 1000,
     };
 }
 
@@ -351,11 +351,77 @@ function buildTornadoData(v) {
 
 // ─── Главный цикл ─────────────────────────────────────────────────────────────
 
+function updateAffordabilityCheck(res) {
+    var v = res.v;
+    var maxMonthlyPayment = v.savingsMonthly;  // максимальный ежемесячный платеж = доходу
+    var maxAnnualPercent = maxMonthlyPayment * 12;  // максимальный годовой процент
+
+    // Рассчитаем максимальные кредиты при текущих ставках
+    var maxL1 = Math.min(25, maxAnnualPercent / v.i1);  // ограничено ползунком
+    var remainingPercent = Math.max(0, maxAnnualPercent - maxL1 * v.i1);
+    var maxL2 = remainingPercent / v.i2;
+
+    // Максимальная сумма покупки
+    var maxTotal = v.equity + maxL1 + maxL2 + v.repair;
+    var maxP0 = maxTotal / (1 - v.discount/100);
+
+    // Текущий расчет: полный ежемесячный процент = льготный + дорогой
+    var currentMonthlyPercent = (res.I1 + res.I2) / 12;
+    var isAffordable = currentMonthlyPercent <= v.savingsMonthly;
+    
+    // Подсветка проблемных ползунков красным
+    var problemSliders = [];
+    if (v.l1 > maxL1) problemSliders.push('l1');
+    if (res.L2 > maxL2) problemSliders.push('p0', 'discount', 'equity', 'repair');
+    
+    // Сброс стилей всех ползунков
+    ['p0', 'discount', 'equity', 'l1', 'repair'].forEach(function(id) {
+        var slider = document.getElementById(id);
+        if (slider) {
+            if (problemSliders.indexOf(id) >= 0) {
+                slider.style.accentColor = '#dc3545';
+                slider.parentElement.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+                slider.parentElement.style.borderRadius = '6px';
+                slider.parentElement.style.padding = '8px';
+            } else {
+                slider.style.accentColor = '';
+                slider.parentElement.style.backgroundColor = '';
+                slider.parentElement.style.borderRadius = '';
+                slider.parentElement.style.padding = '';
+            }
+        }
+    });
+    
+    var resultDiv = document.getElementById('affordabilityResult');
+    if (isAffordable) {
+        resultDiv.innerHTML = 
+            '<div style="color: #28a745; font-weight: bold;">✅ Кредит доступен</div>' +
+            '<div style="font-size: 0.9em; margin-top: 5px;">' +
+            'Ежемесячный платеж: <b>' + (currentMonthlyPercent * 1000).toFixed(0) + ' тыс</b> из ' + (v.savingsMonthly * 1000).toFixed(0) + ' тыс доступных<br>' +
+            'Запас: <b>' + ((v.savingsMonthly - currentMonthlyPercent) * 1000).toFixed(0) + ' тыс/мес</b>' +
+            '</div>';
+        resultDiv.style.backgroundColor = '#d4edda';
+        resultDiv.style.border = '1px solid #c3e6cb';
+    } else {
+        var deficit = currentMonthlyPercent - v.savingsMonthly;
+        resultDiv.innerHTML = 
+            '<div style="color: #dc3545; font-weight: bold;">❌ Кредит недоступен</div>' +
+            '<div style="font-size: 0.9em; margin-top: 5px;">' +
+            'Нужно: <b>' + (currentMonthlyPercent * 1000).toFixed(0) + ' тыс/мес</b>, есть: <b>' + (v.savingsMonthly * 1000).toFixed(0) + ' тыс</b><br>' +
+            'Дефицит: <b>' + (deficit * 1000).toFixed(0) + ' тыс/мес</b><br>' +
+            '<div style="margin-top: 8px; color: #6c757d;">💡 Максимальная квартира при текущем доходе: <b>' + maxP0.toFixed(1) + ' млн</b></div>' +
+            '</div>';
+        resultDiv.style.backgroundColor = '#f8d7da';
+        resultDiv.style.border = '1px solid #f5c6cb';
+    }
+}
+
 function updateUI() {
     var v   = getValues();
     var res = Calc.calculate(v);
 
     updateSliderLabels(v);
+    updateAffordabilityCheck(res);
 
     // Обновляем динамические заголовки
     var h = document.getElementById('chartFinalTitle');
@@ -368,10 +434,10 @@ function updateUI() {
     renderSavingsImpact(res);
 
     var warning = document.getElementById('warningMessage');
-    if (res.L2 > 0 && Calc.fv(v.s0, v.g, v.t1) < res.L2) {
+    if (res.L2 > 0 && Calc.fv(v.s0, v.g_old, v.t1) < res.L2) {
         warning.style.display = 'block';
         warning.textContent = '⚠ Выручка от продажи квартиры через ' + v.t1 + ' лет ('
-            + fmt(Calc.fv(v.s0, v.g, v.t1)) + ' млн) < долга ('
+            + fmt(Calc.fv(v.s0, v.g_old, v.t1)) + ' млн) < долга ('
             + fmt(res.L2) + ' млн). Нехватка учтена через повышенную ставку.';
     } else {
         warning.style.display = 'none';
