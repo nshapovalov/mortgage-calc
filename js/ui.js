@@ -214,8 +214,8 @@ function renderIntermediate(res) {
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
         + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + '<p>Откладываете на вклад: <b>' + (monthlyDeficit ? '0' : (v.savingsMonthly*1000).toFixed(0)) + ' тыс/мес</b>' 
-        + (monthlyDeficit ? ' (нет возможности — уходит на проценты)' : ' (остаток после процентов)') + '</p>'
+        + '<p>Откладываете на вклад: <b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> (как в базовом сценарии)'
+        + (monthlyDeficit ? '<br><small class="negative">Примечание: проценты превышают сбережения, но в модели учитываются через отдельный paid loop</small>' : '') + '</p>'
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;

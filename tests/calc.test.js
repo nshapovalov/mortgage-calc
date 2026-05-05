@@ -238,12 +238,10 @@ describe('calculate — краевые случаи', () => {
 // ─── Сбережения в сценарии А ──────────────────────────────────────────────────
 
 describe('savings in dealCapital', () => {
-    test('savingsDealFV учитывает дефицит от процентов и освобождённые % после t1', () => {
+    test('savingsDealFV >= saveFV при одинаковых параметрах (освобождённые % дают бонус)', () => {
         const r = calculate(defaultParams());
-        // При дефиците (проценты > сбережений): savingsDealFV может быть < saveFV в первые годы
-        // Но после t1 должны появиться освобождённые средства
-        expect(r.freedMonthly).toBeGreaterThan(0);
-        expect(r.savingsDealFV).toBeGreaterThan(0);
+        // saveFV = базовые сбережения; savingsDealFV включает освобождённые % после t1
+        expect(r.savingsDealFV).toBeGreaterThanOrEqual(r.saveFV);
     });
 
     test('freedMonthly = 0 если L2 = 0 и repayL1Early = false', () => {
