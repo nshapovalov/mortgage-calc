@@ -124,11 +124,15 @@ function calculate(v) {
         : 0;
     var initialRestFV = F0 > 0 ? fv(F0, v.r, v.T) : 0;
     
-    // Будущая стоимость уплаченных % (не просто сумма, а с компаундированием)
+    // Будущая стоимость уплаченных % 
     var interestFV = 0;
-    for (var k = 1; k <= Math.min(v.T, v.t1); k++)
-        interestFV += (I1 + I2) * fv(1, v.r, v.T - k);
-    if (!canRepayL1) {
+    if (canRepayL1) {
+        // Все кредиты погашены в t1 - проценты не компаундируются после погашения
+        interestFV = totalPercent;
+    } else {
+        // Кредиты не погашены досрочно - проценты компаундируются до T
+        for (var k = 1; k <= Math.min(v.T, v.t1); k++)
+            interestFV += (I1 + I2) * fv(1, v.r, v.T - k);
         for (var k2 = v.t1 + 1; k2 <= v.T; k2++)
             interestFV += I1 * fv(1, v.r, v.T - k2);
     }
