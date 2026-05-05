@@ -214,8 +214,9 @@ function renderIntermediate(res) {
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
         + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + '<p>Откладываете на вклад: <b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> (как в базовом сценарии)'
-        + (monthlyDeficit ? '<br><small class="negative">Примечание: проценты превышают сбережения, но в модели учитываются через отдельный paid loop</small>' : '') + '</p>'
+        + (monthlyDeficit 
+            ? '<p>Сбережения: <b>невозможны</b> (весь доход уходит на проценты)</p>'
+            : '<p>Откладываете на вклад: <b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> (остаток после процентов)</p>')
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;
@@ -235,10 +236,13 @@ function renderIntermediate(res) {
             ? '<p>Гасите льготный кредит: −' + fmt(v.l1) + ' млн</p>'
               + '<p>Остаток на вклад: <b>' + fmt(afterL2 - v.l1) + ' млн</b></p>'
               + '<p>Дальше платёж по кредиту: <b>0</b></p>'
-            : (!shortfall && res.L2 > 0
+                : (!shortfall && res.L2 > 0
                 ? '<p>Остаток на вклад: <b>' + fmt(afterL2) + ' млн</b></p>'
                   + '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'
                 : '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'))
+        + (monthlyDeficit && res.freedMonthly > 0
+            ? '<p class="positive">✅ Теперь освободились средства! Откладываете на вклад: <b>' + ((v.savingsMonthly + res.freedMonthly)*1000).toFixed(0) + ' тыс/мес</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' базовые + ' + (res.freedMonthly*1000).toFixed(0) + ' освобождённые)</p>'
+            : '')
         + '</div>';
 
     var s4 = '<div class="step-block">'
