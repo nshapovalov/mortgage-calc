@@ -53,17 +53,11 @@ function calculate(v) {
     var S1_t1 = fv(v.s0, v.g_old, v.t1);
     var canRepayL1 = !!(v.repayL1Early) && (S1_t1 - L2) >= v.l1;
 
-    // Ежемесячные % которые освобождаются после t1 (добавляются к базовым сбережениям)
-    var savedOnPercent = canRepayL1 ? (I1 + I2) / 12 : (L2 > 0 ? I2 / 12 : 0);
-    var freedMonthly = Math.max(0, savedOnPercent); // всегда >= 0
-
-    // Сбережения в сценарии А: те же savingsMonthly + освобождённые % после t1
+    // Сбережения в сценарии А: те же savingsMonthly на весь срок.
+    // Выгода от погашения L2 при t1 уже учтена в цикле paid (после t1 вычитается только I1, не I1+I2).
     function savingsDeal(t) {
         if (t === 0) return 0;
-        if (t <= v.t1) return fvAnnuityMonthly(v.savingsMonthly, v.r, t);
-        var phase1 = fvAnnuityMonthly(v.savingsMonthly, v.r, v.t1) * fv(1, v.r, t - v.t1);
-        var phase2 = fvAnnuityMonthly(v.savingsMonthly + freedMonthly, v.r, t - v.t1);
-        return phase1 + phase2;
+        return fvAnnuityMonthly(v.savingsMonthly, v.r, t);
     }
 
     // Капитал по сделке в момент t
@@ -138,7 +132,7 @@ function calculate(v) {
         WB: WB, WA: WA, diff: diff,
         npvDirect: npvDirect,
         monthlyPay: monthlyPay, totalPercent: totalPercent, saveFV: saveFV,
-        canRepayL1: canRepayL1, S1_t1: S1_t1, freedMonthly: freedMonthly,
+        canRepayL1: canRepayL1, S1_t1: S1_t1,
         savingsDealFV: savingsDeal(v.T),
         // Breakdown для Step 4
         newAptFinal: newAptFinal,
@@ -184,14 +178,7 @@ function computeSensNPV(overrides, base) {
     var WA2 = canRL1
         ? PT + dfv + f0 * fv(1, v.r, v.T) - sp
         : (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
-    // Сбережения сценария А: savingsMonthly + освобождённые % после t1
-    var freed2 = canRL1 ? (ia + ib) / 12 : (l2 > 0 ? ib / 12 : 0);
-    if (v.T <= v.t1) {
-        WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
-    } else {
-        WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.t1) * fv(1, v.r, v.T - v.t1)
-             + fvAnnuityMonthly(v.savingsMonthly + freed2, v.r, v.T - v.t1);
-    }
+    WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     return (WA2 - WB2) / fv(1, v.r, v.T);
 }

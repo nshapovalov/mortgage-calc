@@ -240,24 +240,21 @@ function renderIntermediate(res) {
                 ? '<p>Остаток на вклад: <b>' + fmt(afterL2) + ' млн</b></p>'
                   + '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'
                 : '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'))
-        + (monthlyDeficit && res.freedMonthly > 0
-            ? '<p class="positive">✅ Теперь освободились средства! Откладываете на вклад: <b>' + ((v.savingsMonthly + res.freedMonthly)*1000).toFixed(0) + ' тыс/мес</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' базовые + ' + (res.freedMonthly*1000).toFixed(0) + ' освобождённые)</p>'
-            : '')
         + '</div>';
 
     var s4 = '<div class="step-block">'
         + '<div class="step-title">4. Итог через ' + v.T + ' лет</div>'
         + '<p>Новая квартира: <b>' + fmt(res.newAptFinal) + ' млн</b></p>'
         + (!res.canRepayL1 ? '<p>Гасите льготный: −' + fmt(v.l1) + ' млн</p>' : '')
-        + (res.leftoverAfterSale > 0 
+        + (res.leftoverAfterSale > 0
             ? '<p>Остаток от продажи старой → вклад (' + v.t1 + ' г. назад): +' + fmt(res.leftoverGrowthFV) + ' млн</p>'
-            : '')
+            : (res.leftoverAfterSale < 0
+                ? '<p class="negative">Нехватка после продажи (долг растёт по ' + (v.i2*100).toFixed(0) + '%): ' + fmt(res.leftoverGrowthFV) + ' млн</p>'
+                : ''))
         + (res.initialRestFV > 0 
             ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
             : '')
-        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b>'
-        + (res.freedMonthly > 0 ? ' (после продажи: ' + (v.savingsMonthly*1000).toFixed(0) + ' + ' + (res.freedMonthly*1000).toFixed(0) + ' = ' + ((v.savingsMonthly + res.freedMonthly)*1000).toFixed(0) + ' тыс/мес)' : '')
-        + '</p>'
+        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес × ' + v.T + ' лет)</p>'
         + '<p class="negative">Будущая стоимость % банку: −' + fmt(res.interestFV) + ' млн</p>'
         + '<hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'
@@ -319,8 +316,7 @@ function renderSavingsImpact(res) {
     document.getElementById('savingsImpact').innerHTML =
         '<b>Сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес учтены в обоих сценариях.</b>'
         + ' В базовом за ' + v.T + ' лет: <b>' + fmt(res.saveFV) + ' млн</b>.'
-        + ' В сделке: <b>' + fmt(res.savingsDealFV) + ' млн</b>'
-        + (res.freedMonthly > 0 ? ' (после продажи старой добавляется ' + (res.freedMonthly*1000).toFixed(0) + ' тыс/мес)' : '') + '.<br>'
+        + ' В сделке: <b>' + fmt(res.savingsDealFV) + ' млн</b>.<br>'
         + 'Процентов банку за весь срок: <b>' + fmt(res.totalPercent) + ' млн</b>.';
 }
 

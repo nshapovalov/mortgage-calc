@@ -177,16 +177,10 @@ describe('calculate — краевые случаи', () => {
         expect(r.WB).toBeCloseTo(expected, 4);
     });
 
-    test('savingsMonthly = 0: dealCapital(T) учитывает освобождённые % после t1', () => {
+    test('savingsMonthly = 0: savingsDealFV = 0', () => {
         const v = { ...defaultParams(), savingsMonthly: 0 };
         const r = calculate(v);
-        // При L2 > 0 после t1 освобождаются проценты I2, которые копятся как "сбережения"
-        const expectedFreed = r.L2 > 0 ? r.I2 / 12 : 0;
-        if (expectedFreed > 0) {
-            expect(r.savingsDealFV).toBeGreaterThan(0);
-        } else {
-            expect(r.savingsDealFV).toBeCloseTo(0, 4);
-        }
+        expect(r.savingsDealFV).toBeCloseTo(0, 4);
     });
 
     test('savingsMonthly > 0: dealCapital включает сбережения, WA растёт', () => {
@@ -238,23 +232,10 @@ describe('calculate — краевые случаи', () => {
 // ─── Сбережения в сценарии А ──────────────────────────────────────────────────
 
 describe('savings in dealCapital', () => {
-    test('savingsDealFV >= saveFV при одинаковых параметрах (освобождённые % дают бонус)', () => {
+    test('savingsDealFV = saveFV при одинаковых savingsMonthly (нет freedMonthly)', () => {
         const r = calculate(defaultParams());
-        // saveFV = базовые сбережения; savingsDealFV включает освобождённые % после t1
-        expect(r.savingsDealFV).toBeGreaterThanOrEqual(r.saveFV);
-    });
-
-    test('freedMonthly = 0 если L2 = 0 и repayL1Early = false', () => {
-        const v = { ...defaultParams(), equity: 40, l1: 5, repayL1Early: false };
-        // equity+l1=45 > need=40 → L2=0, I2=0
-        const r = calculate(v);
-        expect(r.L2).toBeCloseTo(0, 5);
-        expect(r.freedMonthly).toBeCloseTo(0, 5);
-    });
-
-    test('freedMonthly = I2/12 при L2 > 0 и repayL1Early=false', () => {
-        const r = calculate(defaultParams());
-        expect(r.freedMonthly).toBeCloseTo(r.I2 / 12, 5);
+        // savingsDeal теперь использует единый fvAnnuityMonthly(savingsMonthly, r, T)
+        expect(r.savingsDealFV).toBeCloseTo(r.saveFV, 4);
     });
 
     test('WA > WB или разрыв уменьшается: сбережения в сделке улучшают сценарий А', () => {
