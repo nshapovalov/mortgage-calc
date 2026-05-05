@@ -289,6 +289,13 @@ describe('repayL1Early — досрочное гашение льготного 
         expect(r.totalPercent).toBeCloseTo((r.I1 + r.I2) * v.t1, 5);
     });
 
+    test('interestFV > totalPercent: FV процентов всегда больше номинала (компаундирование)', () => {
+        const withEarly    = calculate({ ...defaultParams(), repayL1Early: true });
+        const withoutEarly = calculate({ ...defaultParams(), repayL1Early: false });
+        expect(withEarly.interestFV).toBeGreaterThan(withEarly.totalPercent);
+        expect(withoutEarly.interestFV).toBeGreaterThan(withoutEarly.totalPercent);
+    });
+
     test('repayL1Early=true: WA > WA без досрочного гашения если r > i1', () => {
         // r=14% > i1=6%, значит финансово невыгодно гасить l1 досрочно → WA ниже
         const withEarly    = calculate({ ...defaultParams(), repayL1Early: true });
