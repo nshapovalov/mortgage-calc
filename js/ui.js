@@ -2,7 +2,7 @@
 
 (function() {
 
-var INPUT_IDS = ['p0', 'discount', 'equity', 'l1', 'repair', 'g', 'r', 't1', 'T', 's0', 'i2', 'savings'];
+var INPUT_IDS = ['p0', 'discount', 'equity', 'l1', 'repair', 'g_new', 'g_old', 'r', 't1', 'T', 's0', 'i2', 'savings'];
 
 // ─── Объяснения показателей (открываются по кнопке ?) ────────────────────────
 
@@ -122,7 +122,8 @@ function getValues() {
         equity:         +document.getElementById('equity').value,
         l1:             +document.getElementById('l1').value,
         repair:         +document.getElementById('repair').value,
-        g:              +document.getElementById('g').value / 100,
+        g_new:          +document.getElementById('g_new').value / 100,
+        g_old:          +document.getElementById('g_old').value / 100,
         r:              +document.getElementById('r').value / 100,
         t1:             +document.getElementById('t1').value,
         T:              +document.getElementById('T').value,
@@ -144,7 +145,8 @@ function updateSliderLabels(v) {
     setLabel('equityVal',   v.equity + ' млн');
     setLabel('l1Val',       v.l1 + ' млн');
     setLabel('repairVal',   v.repair + ' млн');
-    setLabel('gVal',        (v.g * 100).toFixed(1) + '%');
+    setLabel('g_newVal',    (v.g_new * 100).toFixed(1) + '%');
+    setLabel('g_oldVal',    (v.g_old * 100).toFixed(1) + '%');
     setLabel('rVal',        (v.r * 100).toFixed(1) + '%');
     setLabel('t1Val',       v.t1 + ' г');
     setLabel('TVal',        v.T + ' лет');
@@ -224,8 +226,8 @@ function renderNPVExplainer(res) {
 function renderIntermediate(res) {
     var v   = res.v;
     var fv  = Calc.fv;
-    var oldAptSalePrice = fv(v.s0, v.g, v.t1);
-    var newAptFinal     = fv(v.p0, v.g, v.T);
+    var oldAptSalePrice = fv(v.s0, v.g_old, v.t1);
+    var newAptFinal     = fv(v.p0, v.g_new, v.T);
     var shortfall       = res.L2 > 0 && oldAptSalePrice < res.L2;
 
     var s1 = '<div class="step-block">'
@@ -277,14 +279,14 @@ function renderBaseIntermediate(res) {
     var fvM = Calc.fvAnnuityMonthly;
 
     var equityFinal  = fv(v.equity, v.r, v.T);
-    var s0Final      = fv(v.s0, v.g, v.T);
+    var s0Final      = fv(v.s0, v.g_old, v.T);
     var savingsFinal = fvM(v.savingsMonthly, v.r, v.T);
     var midT         = Math.round(v.T / 2);
 
     var b1 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
         + '<div class="step-title" style="color:#475569;">1. Деньги сейчас</div>'
         + '<p><b>' + fmt(v.equity) + ' млн</b> → на вклад под <b>' + (v.r*100).toFixed(1) + '%</b></p>'
-        + '<p>Квартира <b>' + fmt(v.s0) + ' млн</b> остаётся, растёт ' + (v.g*100).toFixed(1) + '%/год</p>'
+        + '<p>Квартира <b>' + fmt(v.s0) + ' млн</b> остаётся, растёт ' + (v.g_old*100).toFixed(1) + '%/год</p>'
         + '</div>';
 
     var b2 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
@@ -295,7 +297,7 @@ function renderBaseIntermediate(res) {
 
     var b3 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
         + '<div class="step-title" style="color:#475569;">3. Квартира дорожает</div>'
-        + '<p>' + fmt(v.s0) + ' × (1+' + (v.g*100).toFixed(1) + '%)^' + v.T + ' = <b>' + fmt(s0Final) + ' млн</b></p>'
+        + '<p>' + fmt(v.s0) + ' × (1+' + (v.g_old*100).toFixed(1) + '%)^' + v.T + ' = <b>' + fmt(s0Final) + ' млн</b></p>'
         + '</div>';
 
     var b4 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
@@ -322,8 +324,9 @@ function renderSavingsImpact(res) {
 
 function buildTornadoData(v) {
     var params = [
-        { key: 'g',             label: 'Рост цен на жильё',  delta: 0.02 },
-        { key: 'r',             label: 'Ставка вклада',       delta: 0.02 },
+        { key: 'g_new',         label: 'Рост новой квартиры', delta: 0.02 },
+        { key: 'g_old',         label: 'Рост старой квартиры',delta: 0.02 },
+        { key: 'r',             label: 'Ставка вклада',        delta: 0.02 },
         { key: 't1',            label: 'Срок продажи старой', delta: 1, round: true },
         { key: 'repair',        label: 'Ремонт',               pct: 0.3 },
         { key: 'discount',      label: 'Скидка',               delta: 0.03 },

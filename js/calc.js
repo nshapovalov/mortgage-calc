@@ -50,7 +50,7 @@ function calculate(v) {
     function baseCapital(t) {
         if (t === 0) return v.equity + v.s0;
         return fv(v.equity, v.r, t)
-             + fv(v.s0, v.g, t)
+             + fv(v.s0, v.g_old, t)
              + fvAnnuityMonthly(v.savingsMonthly, v.r, t);
     }
 
@@ -72,12 +72,12 @@ function calculate(v) {
     function dealCapital(t) {
         if (t === 0) return v.p0 + v.s0 - v.l1 - L2 + F0;
 
-        var cap = fv(v.p0, v.g, t) - v.l1;
+        var cap = fv(v.p0, v.g_new, t) - v.l1;
 
         if (t <= v.t1) {
-            cap += fv(v.s0, v.g, t) - L2;
+            cap += fv(v.s0, v.g_old, t) - L2;
         } else {
-            var S1    = fv(v.s0, v.g, v.t1);
+            var S1    = fv(v.s0, v.g_old, v.t1);
             var delta = S1 - L2;
             cap += delta >= 0
                 ? delta * fv(1, v.r,  t - v.t1)
@@ -110,10 +110,10 @@ function calculate(v) {
         var dealCF = 0;
 
         if (t <= v.t1) dealCF -= (I1 + I2); else dealCF -= I1;
-        if (t === v.t1) { dealCF += fv(v.s0, v.g, v.t1); dealCF -= L2; }
+        if (t === v.t1) { dealCF += fv(v.s0, v.g_old, v.t1); dealCF -= L2; }
         if (t === v.T) {
-            dealCF += fv(v.p0, v.g, v.T) - v.l1;
-            baseCF  += fv(v.s0, v.g, v.T) + fv(v.equity, v.r, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
+            dealCF += fv(v.p0, v.g_new, v.T) - v.l1;
+            baseCF  += fv(v.s0, v.g_old, v.T) + fv(v.equity, v.r, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
         }
         cf[t] = dealCF - baseCF;
     }
@@ -146,9 +146,9 @@ function computeSensNPV(overrides, base) {
     else { l2 = tot - v.equity - v.l1; f0 = 0; }
     var ia = v.l1 * v.i1;
     var ib = l2 * v.i2;
-    var S1 = fv(v.s0, v.g, v.t1);
+    var S1 = fv(v.s0, v.g_old, v.t1);
     var delta = S1 - l2;
-    var PT = fv(v.p0, v.g, v.T);
+    var PT = fv(v.p0, v.g_new, v.T);
     var sp = 0;
     for (var k = 1; k <= v.t1; k++) sp += (ia + ib) * fv(1, v.r, v.T - k);
     for (var k2 = v.t1 + 1; k2 <= v.T; k2++) sp += ia * fv(1, v.r, v.T - k2);
@@ -156,7 +156,7 @@ function computeSensNPV(overrides, base) {
         ? delta * fv(1, v.r,  v.T - v.t1)
         : delta * fv(1, v.i2, v.T - v.t1);
     var WA2 = (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
-    var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
+    var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     return (WA2 - WB2) / fv(1, v.r, v.T);
 }
 

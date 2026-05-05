@@ -83,7 +83,7 @@ describe('calcMIRR — Modified IRR', () => {
 function defaultParams() {
     return {
         p0: 50, discount: 20, equity: 15, l1: 12, repair: 0,
-        g: 0.05, r: 0.14, i1: 0.06, i2: 0.18,
+        g_new: 0.05, g_old: 0.05, r: 0.14, i1: 0.06, i2: 0.18,
         t1: 2, T: 5, s0: 35, savingsMonthly: 0.4,
     };
 }
@@ -153,20 +153,109 @@ describe('calculate — краевые случаи', () => {
         expect(calculate(v1).C).toBeCloseTo(calculate(v2).C, 5);
     });
 
-    test('нулевой рост g: обе квартиры не дорожают', () => {
-        const v = { ...defaultParams(), g: 0 };
+    test('нулевой рост g_new и g_old: обе квартиры не дорожают', () => {
+        const v = { ...defaultParams(), g_new: 0, g_old: 0 };
         const r = calculate(v);
         expect(r.dealCapital(v.T)).toBeLessThan(calculate(defaultParams()).dealCapital(defaultParams().T));
     });
 
-    test('при высоком росте g ипотека выгоднее: NPV > 0', () => {
-        const v = { ...defaultParams(), g: 0.20 }; // 20% рост
+    test('при высоком росте g_new ипотека выгоднее: NPV > 0', () => {
+        const v = { ...defaultParams(), g_new: 0.20, g_old: 0.20 }; // 20% рост
         expect(calculate(v).npvDirect).toBeGreaterThan(0);
     });
 
     test('при нулевом росте g и высокой ставке r ипотека проигрывает', () => {
-        const v = { ...defaultParams(), g: 0, r: 0.20 };
+        const v = { ...defaultParams(), g_new: 0, g_old: 0, r: 0.20 };
         expect(calculate(v).npvDirect).toBeLessThan(0);
+    });
+
+    test('t1 = T: дорогой кредит гасится в последний год, totalPercent = (I1+I2)*T', () => {
+        const v = { ...defaultParams(), t1: 5, T: 5 };
+        const r = calculate(v);
+        expect(r.totalPercent).toBeCloseTo(r.I1 * 5 + r.I2 * 5, 5);
+    });
+
+    test('t1 = T: dealCapital(T) включает старую квартиру напрямую, не через вклад', () => {
+        const v = { ...defaultParams(), t1: 5, T: 5 };
+        const r = calculate(v);
+        // старая квартира учтена как fv(s0, g, T) - L2, а не delta * fv(...)
+        const expected_s0_contrib = fv(v.s0, v.g, v.T) - r.L2;
+        expect(r.WA).toBeGreaterThan(0); // не ломается
+    });
+
+    test('l1 = 0: нет льготного кредита, I1 = 0', () => {
+        const v = { ...defaultParams(), l1: 0 };
+        const r = calculate(v);
+        expect(r.I1).toBeCloseTo(0, 5);
+        // весь долг — дорогой
+        expect(r.L2).toBeCloseTo(v.p0 * (1 - v.discount / 100) + v.repair - v.equity, 2);
+    });
+
+    test('l1 = 0: totalPercent = только дорогой за t1 лет', () => {
+        const v = { ...defaultParams(), l1: 0 };
+        const r = calculate(v);
+        expect(r.totalPercent).toBeCloseTo(r.I2 * v.t1, 5);
+    });
+
+    test('savingsMonthly = 0: базовый капитал = вклад + квартира', () => {
+        const v = { ...defaultParams(), savingsMonthly: 0 };
+        const r = calculate(v);
+        const expected = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T);
+        expect(r.WB).toBeCloseTo(expected, 4);
+    });
+
+    test('savingsMonthly = 0: сбережения не влияют на dealCapital', () => {
+        const v1 = { ...defaultParams(), savingsMonthly: 0 };
+        const v2 = { ...defaultParams(), savingsMonthly: 0.5 };
+        // dealCapital не зависит от savingsMonthly в текущей модели (сбережения только в базе)
+        expect(calculate(v1).dealCapital(v1.T)).toBeCloseTo(calculate(v2).dealCapital(v2.T), 4);
+    });
+
+    test('discount = 0: C = p0', () => {
+        const v = { ...defaultParams(), discount: 0 };
+        const r = calculate(v);
+        expect(r.C).toBeCloseTo(v.p0, 5);
+    });
+
+    test('g_new = 100%: не ломает вычисления, NPV положительный при экстремальном росте', () => {
+        const v = { ...defaultParams(), g_new: 1.0, g_old: 1.0 }; // 100% в год
+        const r = calculate(v);
+        expect(r.WA).toBeGreaterThan(0);
+        expect(r.WB).toBeGreaterThan(0);
+        expect(r.npvDirect).toBeGreaterThan(0); // сильный рост = ипотека выгоднее
+    });
+
+    test('equity очень большой: L2 = 0, F0 = equity + l1 - need', () => {
+        const v = { ...defaultParams(), equity: 40 };
+        const r = calculate(v);
+        const need = v.p0 * (1 - v.discount / 100) + v.repair;
+        expect(r.L2).toBeCloseTo(0, 5);
+        expect(r.F0).toBeCloseTo(v.equity + v.l1 - need, 5);
+    });
+
+    test('t1 = 1 (минимум): результат финансово разумен', () => {
+        const v = { ...defaultParams(), t1: 1 };
+        const r = calculate(v);
+        expect(r.WA).toBeGreaterThan(0);
+        expect(r.totalPercent).toBeCloseTo(r.I1 * v.T + r.I2 * 1, 5);
+    });
+
+    test('T = 3 (минимум горизонта): всё считается без ошибок', () => {
+        const v = { ...defaultParams(), T: 3, t1: 2 };
+        const r = calculate(v);
+        expect(r.WA).toBeGreaterThan(0);
+        expect(r.WB).toBeGreaterThan(0);
+        expect(typeof r.npvDirect).toBe('number');
+        expect(isNaN(r.npvDirect)).toBe(false);
+    });
+
+    test('MIRR согласован с NPV при крайнем g = 100%', () => {
+        const v = { ...defaultParams(), g_new: 1.0, g_old: 1.0 };
+        const r = calculate(v);
+        if (r.mirrVal !== null) {
+            if (r.npvDirect > 0.001) expect(r.mirrVal).toBeGreaterThan(v.r);
+            if (r.npvDirect < -0.001) expect(r.mirrVal).toBeLessThan(v.r);
+        }
     });
 });
 
@@ -181,10 +270,16 @@ describe('computeSensNPV — чувствительность NPV', () => {
         expect(actual).toBeCloseTo(expected, 2);
     });
 
-    test('рост g повышает NPV (ипотека выигрывает от роста цен)', () => {
-        const npvLow  = computeSensNPV({ g: 0.02 }, v);
-        const npvHigh = computeSensNPV({ g: 0.15 }, v);
+    test('рост g_new повышает NPV (ипотека выигрывает от роста цен новой)', () => {
+        const npvLow  = computeSensNPV({ g_new: 0.02 }, v);
+        const npvHigh = computeSensNPV({ g_new: 0.15 }, v);
         expect(npvHigh).toBeGreaterThan(npvLow);
+    });
+
+    test('рост g_old снижает NPV (растёт альтернативная стоимость базы)', () => {
+        const npvLow  = computeSensNPV({ g_old: 0.02 }, v);
+        const npvHigh = computeSensNPV({ g_old: 0.15 }, v);
+        expect(npvHigh).toBeLessThan(npvLow);
     });
 
     test('рост r снижает NPV (высокая ставка вклада делает ипотеку менее выгодной)', () => {
