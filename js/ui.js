@@ -207,12 +207,15 @@ function renderIntermediate(res) {
         + (res.F0 > 0 ? '<p>Остаток ' + fmt(res.F0) + ' млн → на вклад</p>' : '')
         + '</div>';
 
+    var monthlyDeficit = res.monthlyPay > v.savingsMonthly;
     var s2 = '<div class="step-block">'
         + '<div class="step-title">2. Первые ' + v.t1 + ' г. — две квартиры</div>'
         + '<p>% льготный: ' + fmt(res.I1) + ' млн/год (' + (res.I1*1000/12).toFixed(0) + ' тыс/мес, только %)</p>'
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
+        + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + '<p>Откладываете на вклад: <b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> (как в базовом сценарии)</p>'
+        + '<p>Откладываете на вклад: <b>' + (monthlyDeficit ? '0' : (v.savingsMonthly*1000).toFixed(0)) + ' тыс/мес</b>' 
+        + (monthlyDeficit ? ' (нет возможности — уходит на проценты)' : ' (остаток после процентов)') + '</p>'
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;
@@ -226,7 +229,7 @@ function renderIntermediate(res) {
                 : '')
             : '')
         + (v.repayL1Early && !res.canRepayL1
-            ? '<p class="negative">⚠ Досрочное погашение невозможно: нужно ' + fmt(v.l1) + ' млн, выручка только ' + fmt(Math.max(0, afterL2)) + ' млн</p>'
+            ? '<p class="negative">⚠ Досрочное погашение невозможно: нужно ' + fmt(v.l1 + res.L2) + ' млн (льготный + дорогой), выручка только ' + fmt(Math.max(0, res.S1_t1)) + ' млн</p>'
             : '')
         + (res.canRepayL1 && !shortfall
             ? '<p>Гасите льготный кредит: −' + fmt(v.l1) + ' млн</p>'
@@ -249,7 +252,7 @@ function renderIntermediate(res) {
             ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
             : '')
         + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b>'
-        + (res.freedMonthly > 0 ? ' (вкл. освобождённые ' + (res.freedMonthly*1000).toFixed(0) + ' тыс/мес после продажи)' : '')
+        + (res.freedMonthly > 0 ? ' (после продажи: ' + (v.savingsMonthly*1000).toFixed(0) + ' + ' + (res.freedMonthly*1000).toFixed(0) + ' = ' + ((v.savingsMonthly + res.freedMonthly)*1000).toFixed(0) + ' тыс/мес)' : '')
         + '</p>'
         + '<p class="negative">Будущая стоимость % банку: −' + fmt(res.interestFV) + ' млн</p>'
         + '<hr>'

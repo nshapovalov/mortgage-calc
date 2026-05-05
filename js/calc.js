@@ -53,14 +53,24 @@ function calculate(v) {
     var S1_t1 = fv(v.s0, v.g_old, v.t1);
     var canRepayL1 = !!(v.repayL1Early) && (S1_t1 - L2) >= v.l1;
 
-    // Ежемесячные % по дорогому кредиту, которые освобождаются после t1
-    var freedMonthly = canRepayL1 ? (I1 + I2) / 12 : (L2 > 0 ? I2 / 12 : 0);
+    // Ежемесячные % которые освобождаются после t1 (добавляются к базовым сбережениям)
+    var savedOnPercent = canRepayL1 ? (I1 + I2) / 12 : (L2 > 0 ? I2 / 12 : 0);
+    var freedMonthly = Math.max(0, savedOnPercent); // всегда >= 0
 
-    // Сбережения в сценарии А: те же savingsMonthly + освобождённые % после t1
+    // Сбережения в сценарии А: базовые + освобождённые % после t1
     function savingsDeal(t) {
         if (t === 0) return 0;
-        if (t <= v.t1) return fvAnnuityMonthly(v.savingsMonthly, v.r, t);
-        var phase1 = fvAnnuityMonthly(v.savingsMonthly, v.r, v.t1) * fv(1, v.r, t - v.t1);
+        
+        // До продажи старой квартиры: могут быть сбережения только если нет дефицита
+        var monthlyPercent = (I1 + I2) / 12;
+        var actualSavingsBefore = Math.max(0, v.savingsMonthly - monthlyPercent);
+        
+        if (t <= v.t1) {
+            return fvAnnuityMonthly(actualSavingsBefore, v.r, t);
+        }
+        
+        // После продажи: базовые сбережения + освобождённые проценты
+        var phase1 = fvAnnuityMonthly(actualSavingsBefore, v.r, v.t1) * fv(1, v.r, t - v.t1);
         var phase2 = fvAnnuityMonthly(v.savingsMonthly + freedMonthly, v.r, t - v.t1);
         return phase1 + phase2;
     }
@@ -183,12 +193,15 @@ function computeSensNPV(overrides, base) {
     var WA2 = canRL1
         ? PT + dfv + f0 * fv(1, v.r, v.T) - sp
         : (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
-    // Сбережения сценария А: savingsMonthly + освобождённые % после t1
+    // Сбережения сценария А: учитываем дефицит от процентов
     var freed2 = canRL1 ? (ia + ib) / 12 : (l2 > 0 ? ib / 12 : 0);
+    var monthlyPercent2 = (ia + ib) / 12;
+    var actualSavingsBefore2 = Math.max(0, v.savingsMonthly - monthlyPercent2);
+    
     if (v.T <= v.t1) {
-        WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
+        WA2 += fvAnnuityMonthly(actualSavingsBefore2, v.r, v.T);
     } else {
-        WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.t1) * fv(1, v.r, v.T - v.t1)
+        WA2 += fvAnnuityMonthly(actualSavingsBefore2, v.r, v.t1) * fv(1, v.r, v.T - v.t1)
              + fvAnnuityMonthly(v.savingsMonthly + freed2, v.r, v.T - v.t1);
     }
     var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
