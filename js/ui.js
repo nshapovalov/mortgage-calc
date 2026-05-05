@@ -49,21 +49,6 @@ var TIPS = {
         formula: 'NPV = ΔW / (1+r)^T\n\nr — ставка вклада (ваша альтернативная доходность)',
         example: 'ΔW = −15 млн, r = 14%, T = 5 лет:\nNPV = −15 / 1.14⁵ = −15 / 1.925 = −7.8 млн\nИпотека «стоит» вам 7.8 млн в сегодняшних деньгах.',
     },
-    mirr: {
-        title: 'MIRR — годовая доходность вашей сделки',
-        body: 'MIRR (Modified IRR) показывает, под какой годовой процент работают ваши деньги в сделке с ипотекой.\n\n'
-            + 'Сравниваете с доходностью вклада:\n'
-            + '• MIRR > ставка вклада (зелёный) → ипотека зарабатывает быстрее депозита\n'
-            + '• MIRR < ставка вклада (красный) → депозит выгоднее\n\n'
-            + 'Почему не обычный IRR?\n'
-            + 'При продаже старой квартиры в середине срока денежные потоки меняют знак дважды. У стандартного IRR тогда несколько решений или ни одного. '
-            + 'MIRR это обходит: положительные потоки реинвестируются под r%, отрицательные дисконтируются под r%.\n\n'
-            + 'Гарантия: MIRR > r ↔ NPV > 0 — оба показателя всегда согласованы.',
-        formula: 'MIRR = (FV₊ / PV₋)^(1/T) − 1\n\n'
-            + 'FV₊ = Σ CF⁺ₜ × (1+r)^(T−t)  — плюсовые потоки реинвестируем\n'
-            + 'PV₋ = Σ |CF⁻ₜ| / (1+r)^t    — минусовые потоки дисконтируем',
-        example: 'MIRR = 11%, ставка вклада = 14%:\nСделка зарабатывает 11%/год, вклад — 14%/год.\nВклад выгоднее на 3 п.п. в год → NPV отрицательный.',
-    },
     monthly: {
         title: 'Ежемесячный платёж по дорогому кредиту',
         body: 'Это только процентная часть платежа по рыночному кредиту.\n\n'
@@ -164,10 +149,7 @@ function ib(key) { return '<button class="info-btn" data-tip="' + key + '">?</bu
 // ─── Карточки показателей ─────────────────────────────────────────────────────
 
 function renderStats(res) {
-    var v    = res.v;
-    var mirr = res.mirrVal;
-    // MIRR > r ↔ NPV > 0 — это математически гарантировано, поэтому цвет синхронизирован с NPV
-    var mirrGood = mirr !== null && mirr > v.r;
+    var v = res.v;
 
     document.getElementById('statsContainer').innerHTML =
         '<div class="stat-card">'
@@ -187,13 +169,6 @@ function renderStats(res) {
         + '<div class="value ' + cls(res.npvDirect) + '">' + sign(res.npvDirect) + fmt(res.npvDirect) + ' млн</div></div>'
 
         + '<div class="stat-card">'
-        + '<div class="label">MIRR ' + ib('mirr') + '</div>'
-        + '<div class="value ' + (mirrGood ? 'positive' : 'negative') + '">'
-        + (mirr === null ? '—' : (mirr * 100).toFixed(1) + '%')
-        + '<span style="font-size:0.7rem;font-weight:400;color:#64748b;"> (вклад ' + (v.r * 100).toFixed(0) + '%)</span>'
-        + '</div></div>'
-
-        + '<div class="stat-card">'
         + '<div class="label">Платёж % дорогого / мес ' + ib('monthly') + '</div>'
         + '<div class="value">' + (res.monthlyPay * 1000).toFixed(0) + ' тыс ₽</div></div>';
 }
@@ -201,10 +176,8 @@ function renderStats(res) {
 // ─── Вердикт ─────────────────────────────────────────────────────────────────
 
 function renderNPVExplainer(res) {
-    var v    = res.v;
-    var mirr = res.mirrVal;
-    var n    = res.npvDirect;
-    var el   = document.getElementById('npvExplainer');
+    var n  = res.npvDirect;
+    var el = document.getElementById('npvExplainer');
     if (!el) return;
 
     var icon    = n >= 0 ? '✓' : '✗';
@@ -212,14 +185,7 @@ function renderNPVExplainer(res) {
         ? icon + ' Ипотека выгоднее вклада на <b class="positive">' + fmt(n) + ' млн</b> в деньгах сегодня.'
         : icon + ' Вклад выгоднее ипотеки на <b class="negative">' + fmt(Math.abs(n)) + ' млн</b> в деньгах сегодня.';
 
-    var mirrText = mirr !== null
-        ? ' MIRR = <b>' + (mirr * 100).toFixed(1) + '%</b> '
-          + (mirr > v.r
-              ? '<span class="positive">&gt; ' + (v.r*100).toFixed(0) + '% вклада</span>'
-              : '<span class="negative">&lt; ' + (v.r*100).toFixed(0) + '% вклада</span>')
-        : '';
-
-    el.innerHTML = verdict + mirrText;
+    el.innerHTML = verdict;
 }
 
 // ─── Сценарий А: ипотека ─────────────────────────────────────────────────────
@@ -228,7 +194,6 @@ function renderIntermediate(res) {
     var v   = res.v;
     var fv  = Calc.fv;
     var oldAptSalePrice = fv(v.s0, v.g_old, v.t1);
-    var newAptFinal     = fv(v.p0, v.g_new, v.T);
     var shortfall       = res.L2 > 0 && oldAptSalePrice < res.L2;
 
     var s1 = '<div class="step-block">'
@@ -247,6 +212,7 @@ function renderIntermediate(res) {
         + '<p>% льготный: ' + fmt(res.I1) + ' млн/год (' + (res.I1*1000/12).toFixed(0) + ' тыс/мес, только %)</p>'
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
+        + '<p>Откладываете на вклад: <b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> (как в базовом сценарии)</p>'
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;
@@ -258,6 +224,9 @@ function renderIntermediate(res) {
               + (shortfall
                 ? '<p class="negative">⚠ Не хватает ' + fmt(res.L2 - oldAptSalePrice) + ' млн — доп. долг</p>'
                 : '')
+            : '')
+        + (v.repayL1Early && !res.canRepayL1
+            ? '<p class="negative">⚠ Досрочное погашение невозможно: нужно ' + fmt(v.l1) + ' млн, выручка только ' + fmt(Math.max(0, afterL2)) + ' млн</p>'
             : '')
         + (res.canRepayL1 && !shortfall
             ? '<p>Гасите льготный кредит: −' + fmt(v.l1) + ' млн</p>'
@@ -271,10 +240,25 @@ function renderIntermediate(res) {
 
     var s4 = '<div class="step-block">'
         + '<div class="step-title">4. Итог через ' + v.T + ' лет</div>'
-        + '<p>Новая квартира: <b>' + fmt(newAptFinal) + ' млн</b></p>'
+        + '<p>Новая квартира: <b>' + fmt(res.newAptFinal) + ' млн</b></p>'
         + (!res.canRepayL1 ? '<p>Гасите льготный: −' + fmt(v.l1) + ' млн</p>' : '')
-        + '<p class="negative">Всего % банку: −' + fmt(res.totalPercent) + ' млн</p><hr>'
+        + (res.leftoverAfterSale > 0 
+            ? '<p>Остаток от продажи старой → вклад (' + v.t1 + ' г. назад): +' + fmt(res.leftoverGrowthFV) + ' млн</p>'
+            : '')
+        + (res.initialRestFV > 0 
+            ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
+            : '')
+        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b>'
+        + (res.freedMonthly > 0 ? ' (вкл. освобождённые ' + (res.freedMonthly*1000).toFixed(0) + ' тыс/мес после продажи)' : '')
+        + '</p>'
+        + '<p class="negative">Будущая стоимость % банку: −' + fmt(res.interestFV) + ' млн</p>'
+        + '<hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'
+        + '<p style="font-size:0.8rem;color:#64748b;">' 
+        + fmt(res.newAptFinal) + (res.canRepayL1 ? '' : ' − ' + fmt(v.l1)) 
+        + (res.leftoverGrowthFV !== 0 ? (res.leftoverGrowthFV > 0 ? ' + ' : ' − ') + fmt(Math.abs(res.leftoverGrowthFV)) : '')
+        + (res.initialRestFV > 0 ? ' + ' + fmt(res.initialRestFV) : '')
+        + ' + ' + fmt(res.savingsDealFV) + ' − ' + fmt(res.interestFV) + '</p>'
         + '</div>';
 
     document.getElementById('intermediateBlock').innerHTML = s1 + s2 + s3 + s4;
@@ -326,9 +310,11 @@ function renderBaseIntermediate(res) {
 function renderSavingsImpact(res) {
     var v = res.v;
     document.getElementById('savingsImpact').innerHTML =
-        '<b>Сбережения без ипотеки:</b> ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес'
-        + ' → за ' + v.T + ' лет вырастут до <b>' + fmt(res.saveFV) + ' млн</b> (уже в базовом капитале).<br>'
-        + 'В сделке суммарно процентов банку: <b>' + fmt(res.totalPercent) + ' млн</b>.';
+        '<b>Сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес учтены в обоих сценариях.</b>'
+        + ' В базовом за ' + v.T + ' лет: <b>' + fmt(res.saveFV) + ' млн</b>.'
+        + ' В сделке: <b>' + fmt(res.savingsDealFV) + ' млн</b>'
+        + (res.freedMonthly > 0 ? ' (после продажи старой добавляется ' + (res.freedMonthly*1000).toFixed(0) + ' тыс/мес)' : '') + '.<br>'
+        + 'Процентов банку за весь срок: <b>' + fmt(res.totalPercent) + ' млн</b>.';
 }
 
 function buildTornadoData(v) {

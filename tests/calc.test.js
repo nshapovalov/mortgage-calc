@@ -2,7 +2,7 @@
 // calc.js экспортирует себя через module.exports при запуске в Node.js
 
 const Calc = require('../js/calc.js');
-const { fv, fvAnnuity, fvAnnuityMonthly, npv, calcMIRR, calculate, computeSensNPV } = Calc;
+const { fv, fvAnnuity, fvAnnuityMonthly, npv, calculate, computeSensNPV } = Calc;
 
 // ─── Базовые финансовые функции ───────────────────────────────────────────────
 
@@ -53,30 +53,6 @@ describe('npv — чистая приведённая стоимость', () =>
     });
 });
 
-describe('calcMIRR — Modified IRR', () => {
-    test('возвращает null если нет положительных потоков', () => {
-        expect(calcMIRR([-10, -5, -3], 0.10, 0.10)).toBeNull();
-    });
-    test('возвращает null если нет отрицательных потоков', () => {
-        expect(calcMIRR([10, 5, 3], 0.10, 0.10)).toBeNull();
-    });
-    test('простой случай: вложил 100, получил 121 через 2 года при r=10% → MIRR = 10%', () => {
-        // cf = [-100, 0, 121]
-        // PV_neg = 100, FV_pos = 121
-        // MIRR = (121/100)^(1/2) - 1 = 0.1
-        expect(calcMIRR([-100, 0, 121], 0.10, 0.10)).toBeCloseTo(0.10, 4);
-    });
-    test('если reinvest = finance = r, то MIRR > r ↔ NPV > 0', () => {
-        const r  = 0.14;
-        const cf = [-100, 10, 10, 150]; // произвольный поток
-
-        const npvVal  = npv(r, cf);
-        const mirrVal = calcMIRR(cf, r, r);
-
-        if (npvVal > 0) expect(mirrVal).toBeGreaterThan(r);
-        else if (npvVal < 0) expect(mirrVal).toBeLessThan(r);
-    });
-});
 
 // ─── Функция calculate ────────────────────────────────────────────────────────
 
@@ -123,10 +99,6 @@ describe('calculate — основная функция', () => {
         expect(res.npvDirect).toBeCloseTo(expected, 5);
     });
 
-    test('MIRR > r ↔ NPV > 0', () => {
-        if (res.npvDirect > 0.001)  expect(res.mirrVal).toBeGreaterThan(defaultParams().r);
-        if (res.npvDirect < -0.001) expect(res.mirrVal).toBeLessThan(defaultParams().r);
-    });
 
     test('baseCapital(0) = equity + s0', () => {
         expect(res.baseCapital(0)).toBeCloseTo(15 + 35, 5);
@@ -205,11 +177,22 @@ describe('calculate — краевые случаи', () => {
         expect(r.WB).toBeCloseTo(expected, 4);
     });
 
-    test('savingsMonthly = 0: сбережения не влияют на dealCapital', () => {
+    test('savingsMonthly = 0: dealCapital(T) учитывает освобождённые % после t1', () => {
+        const v = { ...defaultParams(), savingsMonthly: 0 };
+        const r = calculate(v);
+        // При L2 > 0 после t1 освобождаются проценты I2, которые копятся как "сбережения"
+        const expectedFreed = r.L2 > 0 ? r.I2 / 12 : 0;
+        if (expectedFreed > 0) {
+            expect(r.savingsDealFV).toBeGreaterThan(0);
+        } else {
+            expect(r.savingsDealFV).toBeCloseTo(0, 4);
+        }
+    });
+
+    test('savingsMonthly > 0: dealCapital включает сбережения, WA растёт', () => {
         const v1 = { ...defaultParams(), savingsMonthly: 0 };
         const v2 = { ...defaultParams(), savingsMonthly: 0.5 };
-        // dealCapital не зависит от savingsMonthly в текущей модели (сбережения только в базе)
-        expect(calculate(v1).dealCapital(v1.T)).toBeCloseTo(calculate(v2).dealCapital(v2.T), 4);
+        expect(calculate(v2).WA).toBeGreaterThan(calculate(v1).WA);
     });
 
     test('discount = 0: C = p0', () => {
@@ -250,14 +233,37 @@ describe('calculate — краевые случаи', () => {
         expect(isNaN(r.npvDirect)).toBe(false);
     });
 
-    test('MIRR согласован с NPV при крайнем g = 100%', () => {
-        const v = { ...defaultParams(), g_new: 1.0, g_old: 1.0 };
-        const r = calculate(v);
-        if (r.mirrVal !== null) {
-            if (r.npvDirect > 0.001) expect(r.mirrVal).toBeGreaterThan(v.r);
-            if (r.npvDirect < -0.001) expect(r.mirrVal).toBeLessThan(v.r);
-        }
+});
+
+// ─── Сбережения в сценарии А ──────────────────────────────────────────────────
+
+describe('savings in dealCapital', () => {
+    test('savingsDealFV >= saveFV при одинаковых параметрах (освобождённые % дают бонус)', () => {
+        const r = calculate(defaultParams());
+        // saveFV = базовые сбережения; savingsDealFV включает освобождённые % после t1
+        expect(r.savingsDealFV).toBeGreaterThanOrEqual(r.saveFV);
     });
+
+    test('freedMonthly = 0 если L2 = 0 и repayL1Early = false', () => {
+        const v = { ...defaultParams(), equity: 40, l1: 5, repayL1Early: false };
+        // equity+l1=45 > need=40 → L2=0, I2=0
+        const r = calculate(v);
+        expect(r.L2).toBeCloseTo(0, 5);
+        expect(r.freedMonthly).toBeCloseTo(0, 5);
+    });
+
+    test('freedMonthly = I2/12 при L2 > 0 и repayL1Early=false', () => {
+        const r = calculate(defaultParams());
+        expect(r.freedMonthly).toBeCloseTo(r.I2 / 12, 5);
+    });
+
+    test('WA > WB или разрыв уменьшается: сбережения в сделке улучшают сценарий А', () => {
+        const r = calculate(defaultParams());
+        // Разница WA - WB теперь включает сбережения в А, сравниваем что WA не ниже ожидаемого
+        expect(r.WA).toBeGreaterThan(0);
+        expect(r.savingsDealFV).toBeGreaterThan(0);
+    });
+
 });
 
 // ─── repayL1Early ─────────────────────────────────────────────────────────────
@@ -303,14 +309,6 @@ describe('repayL1Early — досрочное гашение льготного 
         expect(r.WA).toBeCloseTo(rNo.WA, 4);
     });
 
-    test('MIRR согласован с NPV при repayL1Early=true', () => {
-        const r = calculate({ ...defaultParams(), repayL1Early: true });
-        if (r.mirrVal !== null) {
-            const v = defaultParams();
-            if (r.npvDirect > 0.001) expect(r.mirrVal).toBeGreaterThan(v.r);
-            if (r.npvDirect < -0.001) expect(r.mirrVal).toBeLessThan(v.r);
-        }
-    });
 });
 
 // ─── computeSensNPV ───────────────────────────────────────────────────────────

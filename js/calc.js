@@ -25,23 +25,6 @@ function npv(rate, cashflows) {
     }, 0);
 }
 
-// MIRR — Modified IRR, решает проблему нескольких нулей у стандартного IRR.
-// Положительные потоки реинвестируются по reinvestRate (обычно ставка вклада r).
-// Отрицательные потоки дисконтируются по financeRate (тоже r как альтернативная стоимость).
-// Ключевое свойство при reinvestRate = financeRate = r: MIRR > r ↔ NPV > 0 (всегда согласовано).
-function calcMIRR(cashflows, reinvestRate, financeRate) {
-    var n = cashflows.length - 1;
-    var pvNeg = 0, fvPos = 0;
-    for (var i = 0; i <= n; i++) {
-        if (cashflows[i] < 0) {
-            pvNeg += Math.abs(cashflows[i]) / Math.pow(1 + financeRate, i);
-        } else if (cashflows[i] > 0) {
-            fvPos += cashflows[i] * Math.pow(1 + reinvestRate, n - i);
-        }
-    }
-    if (pvNeg === 0 || fvPos === 0) return null;
-    return Math.pow(fvPos / pvNeg, 1 / n) - 1;
-}
 
 function calculate(v) {
     var annual = v.savingsMonthly * 12;
@@ -71,6 +54,18 @@ function calculate(v) {
     // Цена старой квартиры на момент продажи и флаг досрочного гашения льготного кредита
     var S1_t1 = fv(v.s0, v.g_old, v.t1);
     var canRepayL1 = !!(v.repayL1Early) && (S1_t1 - L2) >= v.l1;
+
+    // Ежемесячные % по дорогому кредиту, которые освобождаются после t1
+    var freedMonthly = canRepayL1 ? (I1 + I2) / 12 : (L2 > 0 ? I2 / 12 : 0);
+
+    // Сбережения в сценарии А: те же savingsMonthly + освобождённые % после t1
+    function savingsDeal(t) {
+        if (t === 0) return 0;
+        if (t <= v.t1) return fvAnnuityMonthly(v.savingsMonthly, v.r, t);
+        var phase1 = fvAnnuityMonthly(v.savingsMonthly, v.r, v.t1) * fv(1, v.r, t - v.t1);
+        var phase2 = fvAnnuityMonthly(v.savingsMonthly + freedMonthly, v.r, t - v.t1);
+        return phase1 + phase2;
+    }
 
     // Капитал по сделке в момент t
     function dealCapital(t) {
@@ -105,6 +100,7 @@ function calculate(v) {
         cap -= paid;
 
         if (F0 > 0) cap += fv(F0, v.r, t);
+        cap += savingsDeal(t);
         return cap;
     }
 
@@ -113,50 +109,45 @@ function calculate(v) {
     var diff = WA - WB;
     var npvDirect = diff / fv(1, v.r, v.T);
 
-    // Разностные денежные потоки (Сделка − База) для MIRR
-    var cf = new Array(v.T + 1).fill(0);
-    cf[0] = -(v.equity - F0);
-    for (var t = 1; t <= v.T; t++) {
-        var savingsFV_t = fvAnnuityMonthly(v.savingsMonthly, v.r, t);
-        var savingsFV_prev = t > 1 ? fvAnnuityMonthly(v.savingsMonthly, v.r, t - 1) : 0;
-        var baseCF = savingsFV_t - savingsFV_prev * (1 + v.r);
-        var dealCF = 0;
-
-        if (t <= v.t1) {
-            dealCF -= (I1 + I2);
-        } else if (!canRepayL1) {
-            dealCF -= I1;
-        }
-        if (t === v.t1) {
-            dealCF += S1_t1 - L2;
-            if (canRepayL1) dealCF -= v.l1;
-        }
-        if (t === v.T) {
-            dealCF += canRepayL1
-                ? fv(v.p0, v.g_new, v.T)
-                : fv(v.p0, v.g_new, v.T) - v.l1;
-            baseCF += fv(v.s0, v.g_old, v.T) + fv(v.equity, v.r, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
-        }
-        cf[t] = dealCF - baseCF;
-    }
-
-    // MIRR с обоими ставками = r: гарантированно MIRR > r ↔ NPV > 0
-    var mirrVal = calcMIRR(cf, v.r, v.r);
-
     var totalPercent = canRepayL1
         ? (I1 + I2) * v.t1
         : I1 * v.T + I2 * v.t1;
     var monthlyPay   = L2 > 0 ? L2 * v.i2 / 12 : 0;
     var saveFV       = fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
 
+    // Breakdown компонентов для Step 4 сценария А
+    var newAptFinal = fv(v.p0, v.g_new, v.T);
+    var leftoverAfterSale = canRepayL1 
+        ? (S1_t1 - L2 - v.l1)
+        : (S1_t1 - L2);
+    var leftoverGrowthFV = leftoverAfterSale !== 0
+        ? leftoverAfterSale * (leftoverAfterSale >= 0 ? fv(1, v.r, v.T - v.t1) : fv(1, v.i2, v.T - v.t1))
+        : 0;
+    var initialRestFV = F0 > 0 ? fv(F0, v.r, v.T) : 0;
+    
+    // Будущая стоимость уплаченных % (не просто сумма, а с компаундированием)
+    var interestFV = 0;
+    for (var k = 1; k <= Math.min(v.T, v.t1); k++)
+        interestFV += (I1 + I2) * fv(1, v.r, v.T - k);
+    if (!canRepayL1) {
+        for (var k2 = v.t1 + 1; k2 <= v.T; k2++)
+            interestFV += I1 * fv(1, v.r, v.T - k2);
+    }
+
     return {
         C: C, L2: L2, F0: F0, I1: I1, I2: I2,
         WB: WB, WA: WA, diff: diff,
         npvDirect: npvDirect,
-        mirrVal: mirrVal,
         monthlyPay: monthlyPay, totalPercent: totalPercent, saveFV: saveFV,
-        canRepayL1: canRepayL1, S1_t1: S1_t1,
-        v: v, cf: cf,
+        canRepayL1: canRepayL1, S1_t1: S1_t1, freedMonthly: freedMonthly,
+        savingsDealFV: savingsDeal(v.T),
+        // Breakdown для Step 4
+        newAptFinal: newAptFinal,
+        leftoverAfterSale: leftoverAfterSale,
+        leftoverGrowthFV: leftoverGrowthFV,
+        initialRestFV: initialRestFV,
+        interestFV: interestFV,
+        v: v,
         baseCapital: baseCapital, dealCapital: dealCapital,
     };
 }
@@ -194,6 +185,14 @@ function computeSensNPV(overrides, base) {
     var WA2 = canRL1
         ? PT + dfv + f0 * fv(1, v.r, v.T) - sp
         : (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
+    // Сбережения сценария А: savingsMonthly + освобождённые % после t1
+    var freed2 = canRL1 ? (ia + ib) / 12 : (l2 > 0 ? ib / 12 : 0);
+    if (v.T <= v.t1) {
+        WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
+    } else {
+        WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.t1) * fv(1, v.r, v.T - v.t1)
+             + fvAnnuityMonthly(v.savingsMonthly + freed2, v.r, v.T - v.t1);
+    }
     var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     return (WA2 - WB2) / fv(1, v.r, v.T);
 }
@@ -205,7 +204,6 @@ exportTarget.Calc = {
     fvAnnuity: fvAnnuity,
     fvAnnuityMonthly: fvAnnuityMonthly,
     npv: npv,
-    calcMIRR: calcMIRR,
     calculate: calculate,
     computeSensNPV: computeSensNPV,
 };

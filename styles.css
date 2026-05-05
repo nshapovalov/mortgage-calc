@@ -7,7 +7,6 @@ body { background: #f4f7fb; margin: 0; padding: 20px; color: #1e293b; overflow-x
     background: white; border-radius: 28px;
     padding: 24px 30px;
     box-shadow: 0 20px 35px rgba(0,0,0,0.05);
-    overflow-x: hidden;
 }
 
 h1 { margin: 0 0 10px; font-weight: 600; font-size: 1.9rem; color: #0f172a; }
@@ -36,7 +35,7 @@ h1 { margin: 0 0 10px; font-weight: 600; font-size: 1.9rem; color: #0f172a; }
 
 /* Stats cards */
 .stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr));
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
     gap: 12px; background: #fff; border-radius: 20px; padding: 16px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.03);
 }
