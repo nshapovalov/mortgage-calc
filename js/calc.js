@@ -27,8 +27,6 @@ function npv(rate, cashflows) {
 
 
 function calculate(v) {
-    var annual = v.savingsMonthly * 12;
-
     // Базовый сценарий: equity лежит на вкладе, старая квартира растёт, сбережения ежемесячные
     function baseCapital(t) {
         if (t === 0) return v.equity + v.s0;
