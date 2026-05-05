@@ -1,0 +1,15 @@
+{
+  "name": "mortgage-calc",
+  "version": "1.0.0",
+  "description": "Ипотека vs Вклад — финансовый калькулятор",
+  "scripts": {
+    "test": "jest --coverage"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"]
+  }
+}

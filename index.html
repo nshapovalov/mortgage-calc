@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Ипотека vs Вклад</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Модальное окно объяснения показателя -->
+<div id="tipModal" class="tip-modal" style="display:none;" role="dialog" aria-modal="true">
+    <div class="tip-modal-inner">
+        <button class="tip-close" id="tipClose" aria-label="Закрыть">×</button>
+        <div id="tipContent"></div>
+    </div>
+</div>
+
+<div class="container">
+    <h1>Ипотека vs Вклад</h1>
+    <div class="subtitle">
+        Сравниваем два сценария: купить трёшку сейчас в ипотеку — или копить на вкладе.
+        Двигайте ползунки — всё пересчитается.
+    </div>
+
+    <div class="dashboard">
+
+        <!-- Левая панель: параметры -->
+        <div class="controls">
+            <h3 style="margin:0 0 14px;">Параметры</h3>
+
+            <div class="control-group">
+                <label>Рыночная цена новой квартиры <span class="value-display" id="p0Val">50 млн</span></label>
+                <input type="range" id="p0" min="30" max="80" value="50" step="1">
+            </div>
+            <div class="control-group">
+                <label>Скидка при покупке <span class="value-display" id="discountVal">20%</span></label>
+                <input type="range" id="discount" min="0" max="40" value="20" step="1">
+            </div>
+            <div class="control-group">
+                <label>Свои средства <span class="value-display" id="equityVal">15 млн</span></label>
+                <input type="range" id="equity" min="5" max="40" value="15" step="1">
+            </div>
+            <div class="control-group">
+                <label>Льготный кредит (6%) <span class="value-display" id="l1Val">12 млн</span></label>
+                <input type="range" id="l1" min="0" max="25" value="12" step="1">
+            </div>
+            <div class="control-group">
+                <label>Стоимость ремонта <span class="value-display" id="repairVal">0 млн</span></label>
+                <input type="range" id="repair" min="0" max="10" value="0" step="0.5">
+            </div>
+            <hr>
+            <div class="control-group">
+                <label>Рост цен на недвижимость / год <span class="value-display" id="gVal">5%</span></label>
+                <input type="range" id="g" min="0" max="20" value="5" step="0.5">
+            </div>
+            <div class="control-group">
+                <label>Ставка по вкладам / год <span class="value-display" id="rVal">14%</span></label>
+                <input type="range" id="r" min="5" max="20" value="14" step="0.5">
+            </div>
+            <div class="control-group">
+                <label>Ставка дорогого кредита / год <span class="value-display" id="i2Val">18%</span></label>
+                <input type="range" id="i2" min="10" max="28" value="18" step="0.5">
+            </div>
+            <hr>
+            <div class="control-group">
+                <label>Текущая цена вашей квартиры <span class="value-display" id="s0Val">35 млн</span></label>
+                <input type="range" id="s0" min="15" max="60" value="35" step="1">
+            </div>
+            <div class="control-group">
+                <label>Через сколько лет продаёте старую <span class="value-display" id="t1Val">2 года</span></label>
+                <input type="range" id="t1" min="1" max="7" value="2" step="1">
+            </div>
+            <div class="control-group">
+                <label>Горизонт планирования <span class="value-display" id="TVal">5 лет</span></label>
+                <input type="range" id="T" min="3" max="10" value="5" step="1">
+            </div>
+            <div class="control-group">
+                <label>Ежемес. сбережения без ипотеки <span class="value-display" id="savingsVal">400 тыс</span></label>
+                <input type="range" id="savings" min="0" max="1000" value="400" step="10">
+            </div>
+
+            <hr>
+            <div class="assumptions-box">
+                <h4>Допущения модели</h4>
+                <ul style="padding-left:18px; margin:0; line-height:1.9;">
+                    <li>
+                        <b>Тело долга не амортизируется</b> — в реальной ипотеке каждый месяц вы платите часть долга и часть процентов (аннуитет). Здесь упрощённо: платятся только проценты, а весь долг гасится единовременно при продаже квартиры. Реальный платёж будет чуть выше, а переплата чуть ниже.
+                    </li>
+                    <li>
+                        <b>Рост цен одинаков</b> для новой и старой квартиры. На практике зависит от локации и типа жилья.
+                    </li>
+                    <li>
+                        <b>Налоги не учтены.</b> Что реально возникает:
+                        <ul style="margin:4px 0; padding-left:16px;">
+                            <li>НДФЛ 13% с прибыли от продажи квартиры, если владели <b>менее 5 лет</b> (3 года — если это единственное жильё). При продаже новостройки срок считается с даты подписания ДДУ.</li>
+                            <li>Налог на имущество: ~0.1–0.3% кадастровой стоимости / год.</li>
+                            <li>Страхование по ипотеке: ~0.3–0.5% суммы кредита / год (обязательно для недвижимости, опционально для жизни, но без него банк повышает ставку).</li>
+                            <li>Услуги риелтора: 2–4% от суммы сделки при продаже.</li>
+                            <li>Регистрация, нотариус, банковские комиссии: 50–150 тыс ₽ единовременно.</li>
+                        </ul>
+                    </li>
+                    <li>
+                        <b>Сбережения ежемесячные</b> — модель считает вклад с ежемесячным пополнением (как зарплата). Ставка начисляется помесячно.
+                    </li>
+                    <li>Все суммы в миллионах рублей, без инфляции внутри периода.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Правая панель: результаты -->
+        <div class="results-panel">
+
+            <div class="stats" id="statsContainer"></div>
+            <div id="warningMessage" class="warning" style="display:none;"></div>
+            <div class="npv-explainer" id="npvExplainer"></div>
+            <div class="highlight-box" id="savingsImpact"></div>
+
+            <h3 style="margin:0 0 8px; font-size:1rem; color:#1e40af;">
+                Сценарий А — Ипотека: куда идут деньги
+            </h3>
+            <div class="intermediate" id="intermediateBlock"></div>
+
+            <h3 style="margin:16px 0 8px; font-size:1rem; color:#475569;">
+                Сценарий Б — Вклад: куда идут деньги
+            </h3>
+            <div class="intermediate" id="baseBlock"></div>
+
+            <div class="chart-row">
+                <div class="chart-box">
+                    <h4 style="margin:0 0 6px;">Рост чистого капитала по годам</h4>
+                    <canvas id="chartNetWorth" width="400" height="200"></canvas>
+                </div>
+                <div class="chart-box">
+                    <h4 id="chartFinalTitle" style="margin:0 0 6px;">Итоговый капитал через 5 лет</h4>
+                    <canvas id="chartFinal" width="400" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="tornado-box chart-box">
+                <h4 style="margin:0 0 4px;">
+                    Чувствительность NPV к параметрам
+                    <button class="info-btn" data-tip="tornado" style="margin-left:6px;">?</button>
+                </h4>
+                <p style="font-size:0.82rem; color:#64748b; margin:0 0 8px;">
+                    Длиннее полоса → сильнее влияет на итог → главный риск-фактор.
+                </p>
+                <canvas id="chartTornado" width="400" height="220"></canvas>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="js/calc.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
