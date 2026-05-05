@@ -85,6 +85,7 @@ function defaultParams() {
         p0: 50, discount: 20, equity: 15, l1: 12, repair: 0,
         g_new: 0.05, g_old: 0.05, r: 0.14, i1: 0.06, i2: 0.18,
         t1: 2, T: 5, s0: 35, savingsMonthly: 0.4,
+        repayL1Early: false,
     };
 }
 
@@ -253,6 +254,59 @@ describe('calculate — краевые случаи', () => {
         const v = { ...defaultParams(), g_new: 1.0, g_old: 1.0 };
         const r = calculate(v);
         if (r.mirrVal !== null) {
+            if (r.npvDirect > 0.001) expect(r.mirrVal).toBeGreaterThan(v.r);
+            if (r.npvDirect < -0.001) expect(r.mirrVal).toBeLessThan(v.r);
+        }
+    });
+});
+
+// ─── repayL1Early ─────────────────────────────────────────────────────────────
+
+describe('repayL1Early — досрочное гашение льготного кредита', () => {
+    test('repayL1Early=false: canRepayL1 = false, поведение как раньше', () => {
+        const v = { ...defaultParams(), repayL1Early: false };
+        const r = calculate(v);
+        expect(r.canRepayL1).toBe(false);
+        expect(r.totalPercent).toBeCloseTo(r.I1 * v.T + r.I2 * v.t1, 5);
+    });
+
+    test('repayL1Early=true, выручка покрывает L2+l1: canRepayL1 = true', () => {
+        // s0=35, g_old=5%, t1=2: S1 = 35*1.05^2 = 38.6 > L2(13)+l1(12) = 25
+        const v = { ...defaultParams(), repayL1Early: true };
+        const r = calculate(v);
+        expect(r.canRepayL1).toBe(true);
+    });
+
+    test('repayL1Early=true: totalPercent = (I1+I2)*t1, не платим % после t1', () => {
+        const v = { ...defaultParams(), repayL1Early: true };
+        const r = calculate(v);
+        expect(r.totalPercent).toBeCloseTo((r.I1 + r.I2) * v.t1, 5);
+    });
+
+    test('repayL1Early=true: WA > WA без досрочного гашения если r > i1', () => {
+        // r=14% > i1=6%, значит финансово невыгодно гасить l1 досрочно → WA ниже
+        const withEarly    = calculate({ ...defaultParams(), repayL1Early: true });
+        const withoutEarly = calculate({ ...defaultParams(), repayL1Early: false });
+        // r > i1(6%), гасим невыгодно → капитал со снятием меньше
+        expect(withEarly.WA).toBeLessThan(withoutEarly.WA);
+    });
+
+    test('repayL1Early=true, выручка НЕ покрывает L2+l1: canRepayL1 = false, поведение обычное', () => {
+        // s0 маленький — выручка покрывает только часть долга
+        const v = { ...defaultParams(), repayL1Early: true, s0: 10, l1: 20, L2_implicit: true };
+        // need = 50*0.8 = 40; equity+l1 = 15+20 = 35 < 40 → L2=5
+        // S1 = 10*(1.05^2)=11.0; S1-L2=11-5=6 < l1=20 → canRepayL1=false
+        const r = calculate({ ...defaultParams(), repayL1Early: true, s0: 10, l1: 20 });
+        expect(r.canRepayL1).toBe(false);
+        // Поведение как без досрочного гашения
+        const rNo = calculate({ ...defaultParams(), repayL1Early: false, s0: 10, l1: 20 });
+        expect(r.WA).toBeCloseTo(rNo.WA, 4);
+    });
+
+    test('MIRR согласован с NPV при repayL1Early=true', () => {
+        const r = calculate({ ...defaultParams(), repayL1Early: true });
+        if (r.mirrVal !== null) {
+            const v = defaultParams();
             if (r.npvDirect > 0.001) expect(r.mirrVal).toBeGreaterThan(v.r);
             if (r.npvDirect < -0.001) expect(r.mirrVal).toBeLessThan(v.r);
         }

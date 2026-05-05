@@ -130,6 +130,7 @@ function getValues() {
         s0:             +document.getElementById('s0').value,
         i2:             +document.getElementById('i2').value / 100,
         i1:             0.06,
+        repayL1Early:   document.getElementById('repayL1Early').checked,
         savingsMonthly: +document.getElementById('savings').value / 1000,
     };
 }
@@ -243,11 +244,12 @@ function renderIntermediate(res) {
 
     var s2 = '<div class="step-block">'
         + '<div class="step-title">2. Первые ' + v.t1 + ' г. — две квартиры</div>'
-        + '<p>% льготный: ' + fmt(res.I1) + ' млн/год (' + (res.I1*1000/12).toFixed(0) + ' тыс/мес)</p>'
-        + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес</b>)</p>' : '')
+        + '<p>% льготный: ' + fmt(res.I1) + ' млн/год (' + (res.I1*1000/12).toFixed(0) + ' тыс/мес, только %)</p>'
+        + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
         + '</div>';
 
+    var afterL2 = oldAptSalePrice - res.L2;
     var s3 = '<div class="step-block">'
         + '<div class="step-title">3. Год ' + v.t1 + ' — продаёте старую</div>'
         + '<p>Продаёте за: <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
@@ -255,15 +257,22 @@ function renderIntermediate(res) {
             ? '<p>Гасите дорогой кредит: −' + fmt(res.L2) + ' млн</p>'
               + (shortfall
                 ? '<p class="negative">⚠ Не хватает ' + fmt(res.L2 - oldAptSalePrice) + ' млн — доп. долг</p>'
-                : '<p>Остаток на вклад: <b>' + fmt(oldAptSalePrice - res.L2) + ' млн</b></p>')
+                : '')
             : '')
-        + '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год</p>'
+        + (res.canRepayL1 && !shortfall
+            ? '<p>Гасите льготный кредит: −' + fmt(v.l1) + ' млн</p>'
+              + '<p>Остаток на вклад: <b>' + fmt(afterL2 - v.l1) + ' млн</b></p>'
+              + '<p>Дальше платёж по кредиту: <b>0</b></p>'
+            : (!shortfall && res.L2 > 0
+                ? '<p>Остаток на вклад: <b>' + fmt(afterL2) + ' млн</b></p>'
+                  + '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'
+                : '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'))
         + '</div>';
 
     var s4 = '<div class="step-block">'
         + '<div class="step-title">4. Итог через ' + v.T + ' лет</div>'
         + '<p>Новая квартира: <b>' + fmt(newAptFinal) + ' млн</b></p>'
-        + '<p>Гасите льготный: −' + fmt(v.l1) + ' млн</p>'
+        + (!res.canRepayL1 ? '<p>Гасите льготный: −' + fmt(v.l1) + ' млн</p>' : '')
         + '<p class="negative">Всего % банку: −' + fmt(res.totalPercent) + ' млн</p><hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'
         + '</div>';
@@ -381,6 +390,7 @@ function updateUI() {
 INPUT_IDS.forEach(function(id) {
     document.getElementById(id).addEventListener('input', updateUI);
 });
+document.getElementById('repayL1Early').addEventListener('change', updateUI);
 
 initModal();
 Charts.initCharts();

@@ -82,6 +82,16 @@ h1 { margin: 0 0 10px; font-weight: 600; font-size: 1.9rem; color: #0f172a; }
 }
 .tornado-box { flex: 1 1 350px; }
 
+/* Checkbox control */
+.control-check { margin-bottom: 14px; }
+.check-label {
+    display: flex; align-items: center; gap: 8px;
+    font-weight: 500; font-size: 0.9rem; cursor: pointer;
+    justify-content: flex-start;
+}
+.check-label input[type=checkbox] { width: 16px; height: 16px; accent-color: #2563eb; flex-shrink: 0; }
+.check-hint { font-size: 0.78rem; color: #94a3b8; margin-top: 3px; padding-left: 24px; }
+
 /* Assumptions */
 .assumptions-box {
     background: #fff7ed; border-left: 4px solid #f97316;

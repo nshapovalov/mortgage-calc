@@ -68,27 +68,40 @@ function calculate(v) {
     var I1 = v.l1 * v.i1;
     var I2 = L2  * v.i2;
 
+    // Цена старой квартиры на момент продажи и флаг досрочного гашения льготного кредита
+    var S1_t1 = fv(v.s0, v.g_old, v.t1);
+    var canRepayL1 = !!(v.repayL1Early) && (S1_t1 - L2) >= v.l1;
+
     // Капитал по сделке в момент t
     function dealCapital(t) {
         if (t === 0) return v.p0 + v.s0 - v.l1 - L2 + F0;
 
-        var cap = fv(v.p0, v.g_new, t) - v.l1;
+        var cap, paid = 0;
 
         if (t <= v.t1) {
+            cap = fv(v.p0, v.g_new, t) - v.l1;
             cap += fv(v.s0, v.g_old, t) - L2;
+        } else if (canRepayL1) {
+            // При продаже гасим и L2, и l1; остаток идёт на вклад
+            var leftover = S1_t1 - L2 - v.l1;
+            cap = fv(v.p0, v.g_new, t); // l1 уже погашен
+            cap += leftover >= 0
+                ? leftover * fv(1, v.r,  t - v.t1)
+                : leftover * fv(1, v.i2, t - v.t1);
         } else {
-            var S1    = fv(v.s0, v.g_old, v.t1);
-            var delta = S1 - L2;
+            var delta = S1_t1 - L2;
+            cap = fv(v.p0, v.g_new, t) - v.l1;
             cap += delta >= 0
                 ? delta * fv(1, v.r,  t - v.t1)
                 : delta * fv(1, v.i2, t - v.t1);
         }
 
-        var paid = 0;
         for (var k = 1; k <= Math.min(t, v.t1); k++)
             paid += (I1 + I2) * fv(1, v.r, t - k);
-        for (var k2 = v.t1 + 1; k2 <= t; k2++)
-            paid += I1 * fv(1, v.r, t - k2);
+        if (!canRepayL1) {
+            for (var k2 = v.t1 + 1; k2 <= t; k2++)
+                paid += I1 * fv(1, v.r, t - k2);
+        }
         cap -= paid;
 
         if (F0 > 0) cap += fv(F0, v.r, t);
@@ -106,14 +119,23 @@ function calculate(v) {
     for (var t = 1; t <= v.T; t++) {
         var savingsFV_t = fvAnnuityMonthly(v.savingsMonthly, v.r, t);
         var savingsFV_prev = t > 1 ? fvAnnuityMonthly(v.savingsMonthly, v.r, t - 1) : 0;
-        var baseCF = savingsFV_t - savingsFV_prev * (1 + v.r); // прирост сбережений за год t
+        var baseCF = savingsFV_t - savingsFV_prev * (1 + v.r);
         var dealCF = 0;
 
-        if (t <= v.t1) dealCF -= (I1 + I2); else dealCF -= I1;
-        if (t === v.t1) { dealCF += fv(v.s0, v.g_old, v.t1); dealCF -= L2; }
+        if (t <= v.t1) {
+            dealCF -= (I1 + I2);
+        } else if (!canRepayL1) {
+            dealCF -= I1;
+        }
+        if (t === v.t1) {
+            dealCF += S1_t1 - L2;
+            if (canRepayL1) dealCF -= v.l1;
+        }
         if (t === v.T) {
-            dealCF += fv(v.p0, v.g_new, v.T) - v.l1;
-            baseCF  += fv(v.s0, v.g_old, v.T) + fv(v.equity, v.r, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
+            dealCF += canRepayL1
+                ? fv(v.p0, v.g_new, v.T)
+                : fv(v.p0, v.g_new, v.T) - v.l1;
+            baseCF += fv(v.s0, v.g_old, v.T) + fv(v.equity, v.r, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
         }
         cf[t] = dealCF - baseCF;
     }
@@ -121,7 +143,9 @@ function calculate(v) {
     // MIRR с обоими ставками = r: гарантированно MIRR > r ↔ NPV > 0
     var mirrVal = calcMIRR(cf, v.r, v.r);
 
-    var totalPercent = I1 * v.T + I2 * v.t1;
+    var totalPercent = canRepayL1
+        ? (I1 + I2) * v.t1
+        : I1 * v.T + I2 * v.t1;
     var monthlyPay   = L2 > 0 ? L2 * v.i2 / 12 : 0;
     var saveFV       = fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
 
@@ -131,6 +155,7 @@ function calculate(v) {
         npvDirect: npvDirect,
         mirrVal: mirrVal,
         monthlyPay: monthlyPay, totalPercent: totalPercent, saveFV: saveFV,
+        canRepayL1: canRepayL1, S1_t1: S1_t1,
         v: v, cf: cf,
         baseCapital: baseCapital, dealCapital: dealCapital,
     };
@@ -148,14 +173,27 @@ function computeSensNPV(overrides, base) {
     var ib = l2 * v.i2;
     var S1 = fv(v.s0, v.g_old, v.t1);
     var delta = S1 - l2;
+    var canRL1 = !!(v.repayL1Early) && delta >= v.l1;
     var PT = fv(v.p0, v.g_new, v.T);
     var sp = 0;
     for (var k = 1; k <= v.t1; k++) sp += (ia + ib) * fv(1, v.r, v.T - k);
-    for (var k2 = v.t1 + 1; k2 <= v.T; k2++) sp += ia * fv(1, v.r, v.T - k2);
-    var dfv = delta >= 0
-        ? delta * fv(1, v.r,  v.T - v.t1)
-        : delta * fv(1, v.i2, v.T - v.t1);
-    var WA2 = (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
+    if (!canRL1) {
+        for (var k2 = v.t1 + 1; k2 <= v.T; k2++) sp += ia * fv(1, v.r, v.T - k2);
+    }
+    var dfv;
+    if (canRL1) {
+        var leftover = delta - v.l1;
+        dfv = leftover >= 0
+            ? leftover * fv(1, v.r,  v.T - v.t1)
+            : leftover * fv(1, v.i2, v.T - v.t1);
+    } else {
+        dfv = delta >= 0
+            ? delta * fv(1, v.r,  v.T - v.t1)
+            : delta * fv(1, v.i2, v.T - v.t1);
+    }
+    var WA2 = canRL1
+        ? PT + dfv + f0 * fv(1, v.r, v.T) - sp
+        : (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
     var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     return (WA2 - WB2) / fv(1, v.r, v.T);
 }
