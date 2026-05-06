@@ -227,6 +227,14 @@ describe('calculate — краевые случаи', () => {
         expect(isNaN(r.npvDirect)).toBe(false);
     });
 
+    test('T < t1 недопустим — UI должен клампить (в calc результат формально считается, savingsDealFV=0)', () => {
+        // UI клампит t1 < T, но если calc вызвать напрямую — savingsDealFV=0 (сбережения не начались)
+        const v = { ...defaultParams(), T: 3, t1: 5 };
+        const r = calculate(v);
+        expect(r.savingsDealFV).toBeCloseTo(0, 4); // T < t1, сбережения не начались
+        expect(r.WA).toBeGreaterThan(0);           // не крашится
+    });
+
 });
 
 // ─── Сбережения в сценарии А ──────────────────────────────────────────────────

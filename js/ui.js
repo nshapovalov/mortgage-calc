@@ -411,6 +411,14 @@ function updateAffordabilityCheck(res) {
 }
 
 function updateUI() {
+    // Физическое ограничение: t1 < T (нельзя продать квартиру после горизонта)
+    var t1El = document.getElementById('t1');
+    var TEl  = document.getElementById('T');
+    t1El.max = +TEl.value - 1;
+    if (+t1El.value >= +TEl.value) t1El.value = +TEl.value - 1;
+    TEl.min  = +t1El.value + 1;
+    if (+TEl.value <= +t1El.value) TEl.value = +t1El.value + 1;
+
     var v   = getValues();
     var res = Calc.calculate(v);
 
