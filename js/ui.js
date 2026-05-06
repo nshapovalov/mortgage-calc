@@ -212,11 +212,9 @@ function renderIntermediate(res) {
         + '<div class="step-title">2. Первые ' + v.t1 + ' г. — две квартиры</div>'
         + '<p>% льготный: ' + fmt(res.I1) + ' млн/год (' + (res.I1*1000/12).toFixed(0) + ' тыс/мес, только %)</p>'
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
-        + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
+        + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > бюджет ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + (monthlyDeficit 
-            ? '<p>Сбережения: <b>невозможны</b> (весь доход уходит на проценты)</p>'
-            : '<p>Откладываете на вклад: <b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> (остаток после процентов)</p>')
+        + '<p>Сбережения: <b>начнутся после продажи старой (год ' + v.t1 + ')</b></p>'
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;
@@ -254,7 +252,7 @@ function renderIntermediate(res) {
         + (res.initialRestFV > 0 
             ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
             : '')
-        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес × ' + v.T + ' лет)</p>'
+        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес × ' + (v.T - v.t1) + ' лет, с года ' + v.t1 + ')</p>'
         + '<p class="negative">Будущая стоимость % банку: −' + fmt(res.interestFV) + ' млн</p>'
         + '<hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'

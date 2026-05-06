@@ -232,10 +232,16 @@ describe('calculate — краевые случаи', () => {
 // ─── Сбережения в сценарии А ──────────────────────────────────────────────────
 
 describe('savings in dealCapital', () => {
-    test('savingsDealFV = saveFV при одинаковых savingsMonthly (нет freedMonthly)', () => {
+    test('savingsDealFV = fvAnnuityMonthly(savings, r, T-t1) — накопление только после t1', () => {
+        const v = defaultParams();
+        const r = calculate(v);
+        const expected = fvAnnuityMonthly(v.savingsMonthly, v.r, v.T - v.t1);
+        expect(r.savingsDealFV).toBeCloseTo(expected, 4);
+    });
+
+    test('savingsDealFV < saveFV — сбережения в сделке короче (T-t1 < T)', () => {
         const r = calculate(defaultParams());
-        // savingsDeal теперь использует единый fvAnnuityMonthly(savingsMonthly, r, T)
-        expect(r.savingsDealFV).toBeCloseTo(r.saveFV, 4);
+        expect(r.savingsDealFV).toBeLessThan(r.saveFV);
     });
 
     test('WA > WB или разрыв уменьшается: сбережения в сделке улучшают сценарий А', () => {
