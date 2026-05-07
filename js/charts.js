@@ -55,7 +55,7 @@ function initCharts() {
             labels: [],
             datasets: [
                 { label: '', data: [], backgroundColor: 'transparent' },
-                { label: 'Диапазон NPV', data: [], backgroundColor: '#3b82f6' },
+                { label: 'Диапазон PV(Δ)', data: [], backgroundColor: '#3b82f6' },
             ],
         },
         options: {
@@ -63,7 +63,7 @@ function initCharts() {
             responsive: true,
             plugins: { legend: { display: false } },
             scales: {
-                x: { stacked: true, title: { display: true, text: 'NPV (млн ₽)' } },
+                x: { stacked: true, title: { display: true, text: 'PV(Δ богатства), млн ₽' } },
                 y: { stacked: true },
             },
         },
