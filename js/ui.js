@@ -216,7 +216,7 @@ function renderIntermediate(res) {
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
         + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > бюджет ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + '<p>Сбережения: ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес <b>копятся весь срок</b></p>'
+        + '<p>Сбережения: на вклад идёт <b>остаток бюджета</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес минус платежи по %)</p>'
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;
@@ -254,8 +254,9 @@ function renderIntermediate(res) {
         + (res.initialRestFV > 0 
             ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
             : '')
-        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес × ' + v.T + ' лет)</p>'
-        + '<p class="negative">Будущая стоимость % банку: −' + fmt(res.interestFV) + ' млн</p>'
+        + '<p>Потенциал сбережений (до вычета %): <b>+' + fmt(res.savingsDealFV) + ' млн</b></p>'
+        + '<p class="negative">Упущенная выгода и уплата % банку: <b>−' + fmt(res.interestFV) + ' млн</b></p>'
+        + '<p><i>→ Чистые накопления: <b>' + fmt(res.savingsDealFV - res.interestFV) + ' млн</b></i></p>'
         + '<hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'
         + '<p style="font-size:0.8rem;color:#64748b;">' 
@@ -314,12 +315,11 @@ function renderBaseIntermediate(res) {
 function renderSavingsImpact(res) {
     var v = res.v;
     document.getElementById('savingsImpact').innerHTML =
-        '<b>Сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес учтены в обоих сценариях.</b>'
-        + ' В базовом за ' + v.T + ' лет: <b>' + fmt(res.saveFV) + ' млн</b>.'
-        + ' В сделке: <b>' + fmt(res.savingsDealFV) + ' млн</b>.<br>'
-        + 'Номинальные проценты банку за весь срок (сумма годовых процентов только, без альтернативной доходности): <b>'
-        + fmt(res.totalPercent) + ' млн</b>. '
-        + 'В шаге 4 «Будущая стоимость % банку» — иная величина: FV уплаченных процентов с компаундингом под ставку вклада.';
+        '<b>Бюджет на сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес учтен в обоих сценариях.</b><br>'
+        + 'В сценарии "Вклад" он целиком идёт на вклад и приносит за ' + v.T + ' лет: <b>' + fmt(res.saveFV) + ' млн</b>.<br>'
+        + 'В сценарии "Ипотека" из этого бюджета сначала платятся проценты банку, а на вклад идёт только остаток. '
+        + 'Чистые накопления за вычетом выплаченных процентов: <b>' + fmt(res.savingsDealFV - res.interestFV) + ' млн</b>.<br>'
+        + '<i>(Номинальная сумма процентов без учёта упущенной выгоды по вкладу: ' + fmt(res.totalPercent) + ' млн)</i>';
 }
 
 function buildTornadoData(v) {
