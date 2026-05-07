@@ -1,0 +1,14 @@
+---
+description: Claude skills reference for Yandex projects  
+globs: []
+alwaysApply: false
+---
+
+Global skills: ~/.claude/skills/
+- mobile-performance-expert: iOS/Android оптимизация
+- awacs-complete-guide: настройка балансеров  
+- arc: VCS операции в Arcadia
+- develop-task: цикл разработки
+
+Project skills loaded automatically in arcadia projects.
+Check skill before starting complex task.

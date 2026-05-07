@@ -227,11 +227,10 @@ describe('calculate — краевые случаи', () => {
         expect(isNaN(r.npvDirect)).toBe(false);
     });
 
-    test('T < t1 недопустим — UI должен клампить (в calc результат формально считается, savingsDealFV=0)', () => {
-        // UI клампит t1 < T, но если calc вызвать напрямую — savingsDealFV=0 (сбережения не начались)
+    test('T < t1 недопустим — UI должен клампить (в calc результат формально считается)', () => {
         const v = { ...defaultParams(), T: 3, t1: 5 };
         const r = calculate(v);
-        expect(r.savingsDealFV).toBeCloseTo(0, 4); // T < t1, сбережения не начались
+        expect(r.savingsDealFV).toBeGreaterThan(0); // T < t1, сбережения все равно идут T лет
         expect(r.WA).toBeGreaterThan(0);           // не крашится
     });
 
@@ -240,16 +239,16 @@ describe('calculate — краевые случаи', () => {
 // ─── Сбережения в сценарии А ──────────────────────────────────────────────────
 
 describe('savings in dealCapital', () => {
-    test('savingsDealFV = fvAnnuityMonthly(savings, r, T-t1) — накопление только после t1', () => {
+    test('savingsDealFV = fvAnnuityMonthly(savings, r, T) — накопление идёт весь срок', () => {
         const v = defaultParams();
         const r = calculate(v);
-        const expected = fvAnnuityMonthly(v.savingsMonthly, v.r, v.T - v.t1);
+        const expected = fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
         expect(r.savingsDealFV).toBeCloseTo(expected, 4);
     });
 
-    test('savingsDealFV < saveFV — сбережения в сделке короче (T-t1 < T)', () => {
+    test('savingsDealFV === saveFV — сбережения одинаковы в обоих сценариях', () => {
         const r = calculate(defaultParams());
-        expect(r.savingsDealFV).toBeLessThan(r.saveFV);
+        expect(r.savingsDealFV).toBeCloseTo(r.saveFV, 4);
     });
 
     test('WA > WB или разрыв уменьшается: сбережения в сделке улучшают сценарий А', () => {

@@ -1,0 +1,14 @@
+---
+description: MCP servers for Yandex infra - awacs, yql, devtools, deploy
+globs: []
+alwaysApply: false
+---
+
+Available MCP servers:
+- user-awacs: балансировка, конфиги
+- user-yql: запросы к YQL/ClickHouse  
+- user-devtools: CI/CD, Arcanum PR
+- user-wiki: Yandex Wiki
+- user-sherlock: поиск по коду
+
+Use when asked about infra, deploy, monitoring, databases.

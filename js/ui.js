@@ -27,7 +27,8 @@ var TIPS = {
             + '• минус все проценты, уплаченные банку за весь срок',
         formula: 'W_А = (p0×(1+g)^T − l1)\n'
             + '     + max(0, S1 − L2) × (1+r)^(T−t1)\n'
-            + '     − Σₖ %(k) × (1+r)^(T−k)',
+            + '     − Σₖ %(k) × (1+r)^(T−k)\n'
+            + '     + FV_аннуитет(сбережения/мес, r, T)',
         example: 'Квартира 50 млн при росте 5% через 5 лет → 63.8 млн.\nМинус долг 12 млн → 51.8 млн.\nМинус проценты за 5 лет.',
     },
     diff: {
@@ -215,7 +216,7 @@ function renderIntermediate(res) {
         + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
         + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > бюджет ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
         + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + '<p>Сбережения: <b>начнутся после продажи старой (год ' + v.t1 + ')</b></p>'
+        + '<p>Сбережения: ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес <b>копятся весь срок</b></p>'
         + '</div>';
 
     var afterL2 = oldAptSalePrice - res.L2;
@@ -253,7 +254,7 @@ function renderIntermediate(res) {
         + (res.initialRestFV > 0 
             ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
             : '')
-        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес × ' + (v.T - v.t1) + ' лет, с года ' + v.t1 + ')</p>'
+        + '<p>Накопленные сбережения: <b>+' + fmt(res.savingsDealFV) + ' млн</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес × ' + v.T + ' лет)</p>'
         + '<p class="negative">Будущая стоимость % банку: −' + fmt(res.interestFV) + ' млн</p>'
         + '<hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'

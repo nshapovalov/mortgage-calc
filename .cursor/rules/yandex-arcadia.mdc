@@ -1,0 +1,11 @@
+---
+description: Arcadia monorepo rules, arc VCS, build system
+globs: ["**/arcadia/**"]
+alwaysApply: false
+---
+
+- VCS: arc (not git). Use arc commands
+- Build: ya make  
+- Code review: arc pr
+- Paths: mobile/market, mobile/taxi, mobile/eda, mobile/flex-sdk, divkit
+- Skills: ~/.claude/skills/ — check before complex tasks

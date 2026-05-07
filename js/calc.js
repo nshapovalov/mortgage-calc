@@ -53,11 +53,10 @@ function calculate(v) {
     var S1_t1 = fv(v.s0, v.g_old, v.t1);
     var canRepayL1 = !!(v.repayL1Early) && (S1_t1 - L2) >= v.l1;
 
-    // Сбережения в сценарии А: начинаются только после продажи старой квартиры (год t1).
-    // До t1 бюджет savingsMonthly уходит на проценты по кредитам.
+    // Сбережения в сценарии А идут весь срок, как и в Б.
+    // Проценты по кредитам вычитаются отдельно (переменная paid).
     function savingsDeal(t) {
-        if (t <= v.t1) return 0;
-        return fvAnnuityMonthly(v.savingsMonthly, v.r, t - v.t1);
+        return fvAnnuityMonthly(v.savingsMonthly, v.r, t);
     }
 
     // Капитал по сделке в момент t
@@ -178,7 +177,7 @@ function computeSensNPV(overrides, base) {
     var WA2 = canRL1
         ? PT + dfv + f0 * fv(1, v.r, v.T) - sp
         : (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
-    WA2 += (v.T > v.t1 ? fvAnnuityMonthly(v.savingsMonthly, v.r, v.T - v.t1) : 0);
+    WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
     return (WA2 - WB2) / fv(1, v.r, v.T);
 }
