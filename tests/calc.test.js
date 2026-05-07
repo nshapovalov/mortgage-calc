@@ -151,8 +151,6 @@ describe('calculate — краевые случаи', () => {
     test('t1 = T: dealCapital(T) включает старую квартиру напрямую, не через вклад', () => {
         const v = { ...defaultParams(), t1: 5, T: 5 };
         const r = calculate(v);
-        // старая квартира учтена как fv(s0, g, T) - L2, а не delta * fv(...)
-        const expected_s0_contrib = fv(v.s0, v.g, v.T) - r.L2;
         expect(r.WA).toBeGreaterThan(0); // не ломается
     });
 
