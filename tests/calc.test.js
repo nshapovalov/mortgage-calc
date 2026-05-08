@@ -3,9 +3,9 @@ const { calculate, computeSensNPV, fv, fvAnnuityMonthly } = Calc;
 
 function defaultParams() {
     return {
-        p0: 50, discount: 20, equity: 15, l1: 12, repair: 0,
-        g_new: 0.05, g_old: 0.05, r: 0.14, i1: 0.06, i2: 0.18,
-        t1: 2, T: 5, s0: 35, savingsMonthly: 0.4,
+        p0: 31, discount: 0, equity: 15, l1: 12, repair: 8,
+        g_new: 0.20, g_old: 0.12, r: 0.095, i1: 0.06, i2: 0.18,
+        t1: 2, T: 4, s0: 30, savingsMonthly: 0.28,
         repayL1Early: false, loanTerm: 20
     };
 }

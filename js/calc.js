@@ -118,7 +118,7 @@ function calculate(v) {
         if (m % 12 === 0) {
             var year = m / 12;
             var apt_new = v.p0 * Math.pow(1 + v.g_new, year);
-            var apt_old_A = (year <= v.t1) ? v.s0 * Math.pow(1 + v.g_old, year) : 0;
+            var apt_old_A = (year < v.t1) ? v.s0 * Math.pow(1 + v.g_old, year) : 0;
             var apt_old_B = v.s0 * Math.pow(1 + v.g_old, year);
 
             total_int_A += cur_year_int;
