@@ -25,16 +25,7 @@ function npv(rate, cashflows) {
     }, 0);
 }
 
-
 function calculate(v) {
-    // Базовый сценарий: equity лежит на вкладе, старая квартира растёт, сбережения ежемесячные
-    function baseCapital(t) {
-        if (t === 0) return v.equity + v.s0;
-        return fv(v.equity, v.r, t)
-             + fv(v.s0, v.g_old, t)
-             + fvAnnuityMonthly(v.savingsMonthly, v.r, t);
-    }
-
     // Параметры покупки
     var C    = v.p0 * (1 - v.discount / 100);
     var need = C + v.repair;
@@ -46,140 +37,139 @@ function calculate(v) {
         L2 = need - v.equity - v.l1;
         F0 = 0;
     }
-    var I1 = v.l1 * v.i1;
-    var I2 = L2  * v.i2;
 
-    // Цена старой квартиры на момент продажи и флаг досрочного гашения льготного кредита
-    var S1_t1 = fv(v.s0, v.g_old, v.t1);
-    var canRepayL1 = !!(v.repayL1Early) && (S1_t1 - L2) >= v.l1;
+    var rm = v.r / 12;
+    var rm1 = v.i1 / 12;
+    var rm2 = v.i2 / 12;
+    var N_months = (v.loanTerm || 20) * 12;
 
-    // Сбережения в сценарии А идут весь срок, как и в Б.
-    // Проценты по кредитам вычитаются отдельно (переменная paid).
-    function savingsDeal(t) {
-        return fvAnnuityMonthly(v.savingsMonthly, v.r, t);
-    }
+    // Честный аннуитетный платеж по кредитам
+    var pmt1 = v.l1 > 0 ? v.l1 * rm1 / (1 - Math.pow(1+rm1, -N_months)) : 0;
+    var pmt2 = L2 > 0   ? L2 * rm2   / (1 - Math.pow(1+rm2, -N_months)) : 0;
 
-    // Капитал по сделке в момент t
-    function dealCapital(t) {
-        if (t === 0) return v.p0 + v.s0 - v.l1 - L2 + F0;
+    var dep_A = F0;
+    var dep_B = v.equity;
+    var debt_l1 = v.l1;
+    var debt_L2 = L2;
 
-        var cap, paid = 0;
+    var yearly = [];
+    var total_int_A = 0;
+    var total_prin_A = 0;
 
-        if (t <= v.t1) {
-            cap = fv(v.p0, v.g_new, t) - v.l1;
-            cap += fv(v.s0, v.g_old, t) - L2;
-        } else if (canRepayL1) {
-            // При продаже гасим и L2, и l1; остаток идёт на вклад
-            var leftover = S1_t1 - L2 - v.l1;
-            cap = fv(v.p0, v.g_new, t); // l1 уже погашен
-            cap += leftover >= 0
-                ? leftover * fv(1, v.r,  t - v.t1)
-                : leftover * fv(1, v.i2, t - v.t1);
-        } else {
-            var delta = S1_t1 - L2;
-            cap = fv(v.p0, v.g_new, t) - v.l1;
-            cap += delta >= 0
-                ? delta * fv(1, v.r,  t - v.t1)
-                : delta * fv(1, v.i2, t - v.t1);
+    var cur_year_int = 0;
+    var cur_year_prin = 0;
+
+    var wasL1RepaidEarly = false;
+    var S1_t1 = 0;
+
+    // Помесячная симуляция денежных потоков
+    for (var m = 1; m <= v.T * 12; m++) {
+        // Сценарий Б (база): вклад растет, откладываем сбережения
+        dep_B = dep_B * (1 + rm) + v.savingsMonthly;
+
+        // Сценарий А (ипотека): вклад растет, откладываем сбережения, затем списываем платежи
+        dep_A = dep_A * (1 + rm) + v.savingsMonthly;
+
+        var int1 = 0, prin1 = 0, actual_pmt1 = 0;
+        if (debt_l1 > 0) {
+            int1 = debt_l1 * rm1;
+            actual_pmt1 = Math.min(pmt1, debt_l1 + int1);
+            prin1 = actual_pmt1 - int1;
+            debt_l1 -= prin1;
+            dep_A -= actual_pmt1; // Аннуитетный платеж (проценты + тело) идет из бюджета/вклада
         }
 
-        for (var k = 1; k <= Math.min(t, v.t1); k++)
-            paid += (I1 + I2) * fv(1, v.r, t - k);
-        if (!canRepayL1) {
-            for (var k2 = v.t1 + 1; k2 <= t; k2++)
-                paid += I1 * fv(1, v.r, t - k2);
+        var int2 = 0, prin2 = 0, actual_pmt2 = 0;
+        if (debt_L2 > 0) {
+            int2 = debt_L2 * rm2;
+            actual_pmt2 = Math.min(pmt2, debt_L2 + int2);
+            prin2 = actual_pmt2 - int2;
+            debt_L2 -= prin2;
+            dep_A -= actual_pmt2; // Аннуитетный платеж (проценты + тело) идет из бюджета/вклада
         }
-        cap -= paid;
 
-        if (F0 > 0) cap += fv(F0, v.r, t);
-        cap += savingsDeal(t);
-        return cap;
+        cur_year_int += (int1 + int2);
+        cur_year_prin += (prin1 + prin2);
+
+        // Событие продажи старой квартиры в год t1
+        if (m === v.t1 * 12) {
+            S1_t1 = v.s0 * Math.pow(1 + v.g_old, v.t1);
+            dep_A += S1_t1; // деньги от продажи идут на счет
+            
+            // Сразу гасим дорогой кредит L2 (остаток)
+            if (debt_L2 > 0) {
+                var payoff2 = debt_L2;
+                dep_A -= payoff2;
+                cur_year_prin += payoff2;
+                debt_L2 = 0;
+            }
+
+            // Досрочно гасим льготный, если стоит галочка и хватает денег
+            if (v.repayL1Early && dep_A >= debt_l1 && debt_l1 > 0) {
+                var payoff1 = debt_l1;
+                dep_A -= payoff1;
+                cur_year_prin += payoff1;
+                debt_l1 = 0;
+                wasL1RepaidEarly = true;
+            }
+        }
+
+        // Фиксация итогов каждого года
+        if (m % 12 === 0) {
+            var year = m / 12;
+            var apt_new = v.p0 * Math.pow(1 + v.g_new, year);
+            var apt_old_A = (year <= v.t1) ? v.s0 * Math.pow(1 + v.g_old, year) : 0;
+            var apt_old_B = v.s0 * Math.pow(1 + v.g_old, year);
+
+            total_int_A += cur_year_int;
+            total_prin_A += cur_year_prin;
+
+            yearly.push({
+                year: year,
+                A_apt_new: apt_new,
+                A_apt_old: apt_old_A,
+                A_debt_l1: debt_l1,
+                A_debt_L2: debt_L2,
+                A_dep: dep_A,
+                A_NW: apt_new + apt_old_A + dep_A - debt_l1 - debt_L2,
+                A_int: cur_year_int,
+                A_prin: cur_year_prin,
+                
+                B_apt_old: apt_old_B,
+                B_dep: dep_B,
+                B_NW: apt_old_B + dep_B
+            });
+
+            cur_year_int = 0;
+            cur_year_prin = 0;
+        }
     }
 
-    var WB = baseCapital(v.T);
-    var WA = dealCapital(v.T);
+    var WA = yearly[v.T - 1].A_NW;
+    var WB = yearly[v.T - 1].B_NW;
     var diff = WA - WB;
-    var npvDirect = diff / fv(1, v.r, v.T);
+    var npvDirect = diff / Math.pow(1 + v.r, v.T);
 
-    var totalPercent = canRepayL1
-        ? (I1 + I2) * v.t1
-        : I1 * v.T + I2 * v.t1;
-    var monthlyPay   = L2 > 0 ? L2 * v.i2 / 12 : 0;
-    var saveFV       = fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
-
-    // Breakdown компонентов для Step 4 сценария А
-    var newAptFinal = fv(v.p0, v.g_new, v.T);
-    var leftoverAfterSale = canRepayL1 
-        ? (S1_t1 - L2 - v.l1)
-        : (S1_t1 - L2);
-    var leftoverGrowthFV = leftoverAfterSale !== 0
-        ? leftoverAfterSale * (leftoverAfterSale >= 0 ? fv(1, v.r, v.T - v.t1) : fv(1, v.i2, v.T - v.t1))
-        : 0;
-    var initialRestFV = F0 > 0 ? fv(F0, v.r, v.T) : 0;
-    
-    // FV уплаченных % скомпаундированная к году T (для breakdown step 4)
-    var interestFV = 0;
-    for (var k = 1; k <= Math.min(v.T, v.t1); k++)
-        interestFV += (I1 + I2) * fv(1, v.r, v.T - k);
-    if (!canRepayL1) {
-        for (var k2 = v.t1 + 1; k2 <= v.T; k2++)
-            interestFV += I1 * fv(1, v.r, v.T - k2);
-    }
+    var A_NW_0 = v.p0 + v.s0 - v.l1 - L2 + F0;
+    var B_NW_0 = v.equity + v.s0;
 
     return {
-        C: C, L2: L2, F0: F0, I1: I1, I2: I2,
-        WB: WB, WA: WA, diff: diff,
-        npvDirect: npvDirect,
-        monthlyPay: monthlyPay, totalPercent: totalPercent, saveFV: saveFV,
-        canRepayL1: canRepayL1, S1_t1: S1_t1,
-        savingsDealFV: savingsDeal(v.T),
-        // Breakdown для Step 4
-        newAptFinal: newAptFinal,
-        leftoverAfterSale: leftoverAfterSale,
-        leftoverGrowthFV: leftoverGrowthFV,
-        initialRestFV: initialRestFV,
-        interestFV: interestFV,
-        v: v,
-        baseCapital: baseCapital, dealCapital: dealCapital,
+        C: C, L2: L2, F0: F0,
+        pmt1: pmt1, pmt2: pmt2,
+        WA: WA, WB: WB, diff: diff, npvDirect: npvDirect,
+        totalPercent: total_int_A,
+        totalPrin: total_prin_A,
+        yearly: yearly,
+        A_NW_0: A_NW_0, B_NW_0: B_NW_0,
+        wasL1RepaidEarly: wasL1RepaidEarly, S1_t1: S1_t1,
+        v: v
     };
 }
 
 // Быстрый пересчёт NPV с одним изменённым параметром (для торнадо-графика)
 function computeSensNPV(overrides, base) {
     var v = Object.assign({}, base, overrides);
-    var C2  = v.p0 * (1 - v.discount / 100);
-    var tot = C2 + v.repair;
-    var l2, f0;
-    if (v.equity + v.l1 >= tot) { l2 = 0; f0 = v.equity + v.l1 - tot; }
-    else { l2 = tot - v.equity - v.l1; f0 = 0; }
-    var ia = v.l1 * v.i1;
-    var ib = l2 * v.i2;
-    var S1 = fv(v.s0, v.g_old, v.t1);
-    var delta = S1 - l2;
-    var canRL1 = !!(v.repayL1Early) && delta >= v.l1;
-    var PT = fv(v.p0, v.g_new, v.T);
-    var sp = 0;
-    for (var k = 1; k <= v.t1; k++) sp += (ia + ib) * fv(1, v.r, v.T - k);
-    if (!canRL1) {
-        for (var k2 = v.t1 + 1; k2 <= v.T; k2++) sp += ia * fv(1, v.r, v.T - k2);
-    }
-    var dfv;
-    if (canRL1) {
-        var leftover = delta - v.l1;
-        dfv = leftover >= 0
-            ? leftover * fv(1, v.r,  v.T - v.t1)
-            : leftover * fv(1, v.i2, v.T - v.t1);
-    } else {
-        dfv = delta >= 0
-            ? delta * fv(1, v.r,  v.T - v.t1)
-            : delta * fv(1, v.i2, v.T - v.t1);
-    }
-    var WA2 = canRL1
-        ? PT + dfv + f0 * fv(1, v.r, v.T) - sp
-        : (PT - v.l1) + dfv + f0 * fv(1, v.r, v.T) - sp;
-    WA2 += fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
-    var WB2 = fv(v.equity, v.r, v.T) + fv(v.s0, v.g_old, v.T) + fvAnnuityMonthly(v.savingsMonthly, v.r, v.T);
-    return (WA2 - WB2) / fv(1, v.r, v.T);
+    return calculate(v).npvDirect;
 }
 
 var isNode = typeof module !== 'undefined' && module.exports;

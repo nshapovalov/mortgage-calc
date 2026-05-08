@@ -76,8 +76,8 @@ function updateCharts(res, tornadoData) {
 
     if (global.netChart) {
         global.netChart.data.labels = years.map(function(y) { return 'Год ' + y; });
-        global.netChart.data.datasets[0].data = years.map(function(t) { return res.dealCapital(t); });
-        global.netChart.data.datasets[1].data = years.map(function(t) { return res.baseCapital(t); });
+        global.netChart.data.datasets[0].data = years.map(function(t) { return t === 0 ? res.A_NW_0 : res.yearly[t-1].A_NW; });
+        global.netChart.data.datasets[1].data = years.map(function(t) { return t === 0 ? res.B_NW_0 : res.yearly[t-1].B_NW; });
         global.netChart.update();
     }
 

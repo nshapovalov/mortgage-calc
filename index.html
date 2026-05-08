@@ -101,14 +101,15 @@
                 <label>Горизонт планирования <span class="value-display" id="TVal">5 лет</span></label>
                 <input type="range" id="T" min="3" max="10" value="5" step="1">
             </div>
+            <div class="control-group">
+                <label>Срок кредитов <span class="value-display" id="loanTermVal">20 лет</span></label>
+                <input type="range" id="loanTerm" min="5" max="30" value="20" step="1">
+            </div>
 
             <hr>
             <div class="assumptions-box">
                 <h4>Допущения модели</h4>
                 <ul style="padding-left:18px; margin:0; line-height:1.9;">
-                    <li>
-                        <b>Тело долга не амортизируется</b> — в реальной ипотеке каждый месяц вы платите часть долга и часть процентов (аннуитет). Здесь упрощённо: платятся только проценты, а весь долг гасится единовременно при продаже квартиры. Реальный платёж будет чуть выше, а переплата чуть ниже.
-                    </li>
                     <li>
                         <b>Налоги не учтены.</b> Что реально возникает:
                         <ul style="margin:4px 0; padding-left:16px;">
@@ -133,7 +134,6 @@
             <div class="stats" id="statsContainer"></div>
             <div id="warningMessage" class="warning" style="display:none;"></div>
             <div class="npv-explainer" id="npvExplainer"></div>
-            <div class="highlight-box" id="savingsImpact"></div>
 
             <h3 style="margin:0 0 8px; font-size:1rem; color:#1e40af;">
                 Сценарий А — Ипотека: куда идут деньги
@@ -144,6 +144,8 @@
                 Сценарий Б — Вклад: куда идут деньги
             </h3>
             <div class="intermediate" id="baseBlock"></div>
+            
+            <div id="yearlyTableContainer"></div>
 
             <div class="chart-row">
                 <div class="chart-box">

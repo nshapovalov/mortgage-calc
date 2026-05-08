@@ -2,7 +2,7 @@
 
 (function() {
 
-var INPUT_IDS = ['savingsMonthly', 'p0', 'discount', 'equity', 'l1', 'repair', 'g_new', 'g_old', 'r', 't1', 'T', 's0', 'i2'];
+var INPUT_IDS = ['savingsMonthly', 'p0', 'discount', 'equity', 'l1', 'repair', 'g_new', 'g_old', 'r', 't1', 'T', 's0', 'i2', 'loanTerm'];
 
 // ─── Объяснения показателей (открываются по кнопке ?) ────────────────────────
 
@@ -22,14 +22,11 @@ var TIPS = {
         title: 'Капитал по сделке — сценарий «берём ипотеку»',
         body: 'Итоговая сумма, если купить новую квартиру со скидкой и продать старую через t1 лет.\n\n'
             + 'Из чего складывается:\n'
-            + '• новая квартира выросла до p0×(1+g)^T минус остаток льготного долга l1\n'
-            + '• выручка от продажи старой квартиры в год t1 минус погашение дорогого кредита L2 — остаток на вклад\n'
-            + '• минус все проценты, уплаченные банку за весь срок',
-        formula: 'W_А = (p0×(1+g)^T − l1)\n'
-            + '     + max(0, S1 − L2) × (1+r)^(T−t1)\n'
-            + '     − Σₖ %(k) × (1+r)^(T−k)\n'
-            + '     + FV_аннуитет(сбережения/мес, r, T)',
-        example: 'Квартира 50 млн при росте 5% через 5 лет → 63.8 млн.\nМинус долг 12 млн → 51.8 млн.\nМинус проценты за 5 лет.',
+            + '• новая квартира выросла до p0×(1+g)^T\n'
+            + '• выручка от продажи старой квартиры пошла на вклад и погашение долгов\n'
+            + '• минус остаток долга на конец срока\n'
+            + '• плюс накопления на вкладе за вычетом ежемесячных аннуитетных платежей',
+        example: 'Квартира 50 млн при росте 5% через 5 лет → 63.8 млн.\nМинус остаток долга 10 млн → 53.8 млн.\nПлюс накопленный вклад.',
     },
     diff: {
         title: 'Разница ΔW — на сколько сценарии отличаются',
@@ -52,14 +49,13 @@ var TIPS = {
         example: 'ΔW = −15 млн, r = 14%, T = 5 лет:\nPV(Δ) = −15 / 1.14⁵ ≈ −7.8 млн в «сегодняшних» деньгах.',
     },
     monthly: {
-        title: 'Ежемесячный платёж по дорогому кредиту',
-        body: 'Это только процентная часть платежа по рыночному кредиту.\n\n'
-            + 'В модели используется схема interest-only (bullet): каждый месяц вы платите только проценты, '
-            + 'а тело долга гасится целиком при продаже старой квартиры.\n\n'
-            + 'На практике большинство ипотек аннуитетные: платёж выше, но часть уходит на погашение долга. '
-            + 'Реальный платёж будет выше указанного, но общая переплата — ниже.',
-        formula: 'Платёж/мес = L2 × i2 / 12\n\nL2 — сумма дорогого кредита\ni2 — годовая ставка',
-        example: 'L2 = 13 млн, i2 = 18%:\nПлатёж = 13 000 000 × 0.18 / 12 = 195 000 ₽/мес',
+        title: 'Ежемесячный аннуитетный платёж',
+        body: 'Суммарный платёж по всем кредитам (льготному и дорогому).\n\n'
+            + 'Рассчитан по формуле классического аннуитета на указанный срок ипотеки (по умолчанию 20 лет). '
+            + 'Платёж включает в себя и проценты, и выплату тела долга. Эти деньги каждый месяц берутся из вашего '
+            + 'бюджета на сбережения (остаток идёт на вклад, если бюджет больше платежа; если меньше — вклад тает).',
+        formula: 'Платёж/мес = L × rm / (1 - (1+rm)^(-N))',
+        example: 'L = 12 млн, i = 6%, срок = 20 лет (240 мес):\nПлатёж = 85 971 ₽/мес',
     },
     tornado: {
         title: 'График чувствительности PV(Δ богатства) к параметрам',
@@ -119,6 +115,7 @@ function getValues() {
         i1:             0.06,
         repayL1Early:   document.getElementById('repayL1Early').checked,
         savingsMonthly: +document.getElementById('savingsMonthly').value / 1000,
+        loanTerm:       +document.getElementById('loanTerm').value,
     };
 }
 
@@ -141,6 +138,7 @@ function updateSliderLabels(v) {
     setLabel('s0Val',       v.s0 + ' млн');
     setLabel('i2Val',       (v.i2 * 100).toFixed(1) + '%');
     setLabel('savingsVal',  (v.savingsMonthly * 1000).toFixed(0) + ' тыс');
+    setLabel('loanTermVal', v.loanTerm + ' лет');
 }
 
 function fmt(x, d) { return x.toFixed(d !== undefined ? d : 2); }
@@ -152,6 +150,7 @@ function ib(key) { return '<button class="info-btn" data-tip="' + key + '">?</bu
 
 function renderStats(res) {
     var v = res.v;
+    var monthlyPay = res.pmt1 + res.pmt2;
 
     document.getElementById('statsContainer').innerHTML =
         '<div class="stat-card">'
@@ -171,8 +170,8 @@ function renderStats(res) {
         + '<div class="value ' + cls(res.npvDirect) + '">' + sign(res.npvDirect) + fmt(res.npvDirect) + ' млн</div></div>'
 
         + '<div class="stat-card">'
-        + '<div class="label">Платёж % дорогого / мес ' + ib('monthly') + '</div>'
-        + '<div class="value">' + (res.monthlyPay * 1000).toFixed(0) + ' тыс ₽</div></div>';
+        + '<div class="label">Платёж по кредитам / мес ' + ib('monthly') + '</div>'
+        + '<div class="value">' + (monthlyPay * 1000).toFixed(0) + ' тыс ₽</div></div>';
 }
 
 // ─── Вердикт ─────────────────────────────────────────────────────────────────
@@ -193,133 +192,111 @@ function renderNPVExplainer(res) {
 // ─── Сценарий А: ипотека ─────────────────────────────────────────────────────
 
 function renderIntermediate(res) {
-    var v   = res.v;
-    var fv  = Calc.fv;
-    var oldAptSalePrice = fv(v.s0, v.g_old, v.t1);
-    var shortfall       = res.L2 > 0 && oldAptSalePrice < res.L2;
-
+    var v = res.v;
     var s1 = '<div class="step-block">'
-        + '<div class="step-title">1. Покупка прямо сейчас</div>'
-        + '<p>Рыночная цена: <b>' + fmt(v.p0) + ' млн</b></p>'
-        + '<p>Скидка ' + v.discount + '% → цена: <b>' + fmt(res.C) + ' млн</b> (экономия ' + fmt(v.p0 - res.C) + ' млн)</p>'
-        + (v.repair > 0 ? '<p>+ Ремонт: ' + fmt(v.repair) + ' млн</p>' : '')
-        + '<p>Нужно: <b>' + fmt(res.C + v.repair) + ' млн</b></p><hr>'
-        + '<p>Своих: ' + fmt(v.equity) + ' млн &nbsp;+&nbsp; Льготный (6%): ' + fmt(v.l1) + ' млн</p>'
-        + (res.L2 > 0 ? '<p class="negative">Дорогой кредит ' + (v.i2*100).toFixed(0) + '%: <b>+' + fmt(res.L2) + ' млн</b></p>' : '')
-        + (res.F0 > 0 ? '<p>Остаток ' + fmt(res.F0) + ' млн → на вклад</p>' : '')
+        + '<div class="step-title">1. Покупка (Сводка)</div>'
+        + '<p>Цена со скидкой + ремонт: <b>' + fmt(res.C + v.repair) + ' млн</b></p>'
+        + '<p>Свои (' + fmt(v.equity) + ') + Льготный (' + fmt(v.l1) + ')' + (res.L2 > 0 ? ' + Дорогой (' + fmt(res.L2) + ')' : '') + '</p>'
+        + '<p>Платёж: <b>' + ((res.pmt1 + res.pmt2) * 1000).toFixed(0) + ' тыс/мес</b> (списывается из сбережений)</p>'
         + '</div>';
 
-    var monthlyDeficit = res.monthlyPay > v.savingsMonthly;
     var s2 = '<div class="step-block">'
-        + '<div class="step-title">2. Первые ' + v.t1 + ' г. — две квартиры</div>'
-        + '<p>% льготный: ' + fmt(res.I1) + ' млн/год (' + (res.I1*1000/12).toFixed(0) + ' тыс/мес, только %)</p>'
-        + (res.L2 > 0 ? '<p class="negative">% дорогой: ' + fmt(res.I2) + ' млн/год (<b>' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес, только %</b>) — реальный платёж выше: включает тело долга</p>' : '')
-        + (monthlyDeficit ? '<p class="negative">⚠ Дефицит: проценты ' + (res.monthlyPay*1000).toFixed(0) + ' тыс/мес > бюджет ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</p>' : '')
-        + '<p>Старая квартира растёт: ' + fmt(v.s0) + ' → <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + '<p>Сбережения: на вклад идёт <b>остаток бюджета</b> (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес минус платежи по %)</p>'
+        + '<div class="step-title">2. Продажа старой квартиры</div>'
+        + '<p>Год продажи: <b>' + v.t1 + '</b></p>'
+        + '<p>Выручка: <b>' + fmt(res.S1_t1) + ' млн</b></p>'
+        + '<p>Остаток рыночного долга гасится.</p>'
+        + (res.wasL1RepaidEarly ? '<p>Льготный долг гасится досрочно.</p>' : '')
+        + '<p>Разница переходит на вклад.</p>'
         + '</div>';
 
-    var afterL2 = oldAptSalePrice - res.L2;
     var s3 = '<div class="step-block">'
-        + '<div class="step-title">3. Год ' + v.t1 + ' — продаёте старую</div>'
-        + '<p>Продаёте за: <b>' + fmt(oldAptSalePrice) + ' млн</b></p>'
-        + (res.L2 > 0
-            ? '<p>Гасите дорогой кредит: −' + fmt(res.L2) + ' млн</p>'
-              + (shortfall
-                ? '<p class="negative">⚠ Не хватает ' + fmt(res.L2 - oldAptSalePrice) + ' млн — доп. долг</p>'
-                : '')
-            : '')
-        + (v.repayL1Early && !res.canRepayL1
-            ? '<p class="negative">⚠ Досрочное погашение невозможно: нужно ' + fmt(v.l1 + res.L2) + ' млн (льготный + дорогой), выручка только ' + fmt(Math.max(0, res.S1_t1)) + ' млн</p>'
-            : '')
-        + (res.canRepayL1 && !shortfall
-            ? '<p>Гасите льготный кредит: −' + fmt(v.l1) + ' млн</p>'
-              + '<p>Остаток на вклад: <b>' + fmt(afterL2 - v.l1) + ' млн</b></p>'
-              + '<p>Дальше платёж по кредиту: <b>0</b></p>'
-                : (!shortfall && res.L2 > 0
-                ? '<p>Остаток на вклад: <b>' + fmt(afterL2) + ' млн</b></p>'
-                  + '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'
-                : '<p>Дальше платите только: ' + fmt(res.I1) + ' млн/год (только %)</p>'))
-        + '</div>';
-
-    var s4 = '<div class="step-block">'
-        + '<div class="step-title">4. Итог через ' + v.T + ' лет</div>'
-        + '<p>Новая квартира: <b>' + fmt(res.newAptFinal) + ' млн</b></p>'
-        + (!res.canRepayL1 ? '<p>Гасите льготный: −' + fmt(v.l1) + ' млн</p>' : '')
-        + (res.leftoverAfterSale > 0
-            ? '<p>Остаток от продажи старой → вклад (' + v.t1 + ' г. назад): +' + fmt(res.leftoverGrowthFV) + ' млн</p>'
-            : (res.leftoverAfterSale < 0
-                ? '<p class="negative">Нехватка после продажи (долг растёт по ' + (v.i2*100).toFixed(0) + '%): ' + fmt(res.leftoverGrowthFV) + ' млн</p>'
-                : ''))
-        + (res.initialRestFV > 0 
-            ? '<p>Изначальный остаток на вкладе: +' + fmt(res.initialRestFV) + ' млн</p>'
-            : '')
-        + '<p>Потенциал сбережений (до вычета %): <b>+' + fmt(res.savingsDealFV) + ' млн</b></p>'
-        + '<p class="negative">Упущенная выгода и уплата % банку: <b>−' + fmt(res.interestFV) + ' млн</b></p>'
-        + '<p><i>→ Чистые накопления: <b>' + fmt(res.savingsDealFV - res.interestFV) + ' млн</b></i></p>'
+        + '<div class="step-title">3. Итог через ' + v.T + ' лет</div>'
+        + '<p>Новая квартира: <b>' + fmt(res.yearly[v.T - 1].A_apt_new) + ' млн</b></p>'
+        + '<p>Остаток долга: <b class="negative">−' + fmt(res.yearly[v.T - 1].A_debt_l1 + res.yearly[v.T - 1].A_debt_L2) + ' млн</b></p>'
+        + '<p>Вклад (с учётом сбережений): <b>+' + fmt(res.yearly[v.T - 1].A_dep) + ' млн</b></p>'
         + '<hr>'
         + '<p><b>Итого (А): ' + fmt(res.WA) + ' млн</b></p>'
-        + '<p style="font-size:0.8rem;color:#64748b;">' 
-        + fmt(res.newAptFinal) + (res.canRepayL1 ? '' : ' − ' + fmt(v.l1)) 
-        + (res.leftoverGrowthFV !== 0 ? (res.leftoverGrowthFV > 0 ? ' + ' : ' − ') + fmt(Math.abs(res.leftoverGrowthFV)) : '')
-        + (res.initialRestFV > 0 ? ' + ' + fmt(res.initialRestFV) : '')
-        + ' + ' + fmt(res.savingsDealFV) + ' − ' + fmt(res.interestFV) + '</p>'
         + '</div>';
 
-    document.getElementById('intermediateBlock').innerHTML = s1 + s2 + s3 + s4;
+    document.getElementById('intermediateBlock').innerHTML = s1 + s2 + s3;
 }
 
 // ─── Сценарий Б: вклад ───────────────────────────────────────────────────────
 
 function renderBaseIntermediate(res) {
-    var v   = res.v;
-    var fv  = Calc.fv;
-    var fvM = Calc.fvAnnuityMonthly;
-
-    var equityFinal  = fv(v.equity, v.r, v.T);
-    var s0Final      = fv(v.s0, v.g_old, v.T);
-    var savingsFinal = fvM(v.savingsMonthly, v.r, v.T);
-    var midT         = Math.round(v.T / 2);
-
+    var v = res.v;
     var b1 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
-        + '<div class="step-title" style="color:#475569;">1. Деньги сейчас</div>'
-        + '<p><b>' + fmt(v.equity) + ' млн</b> → на вклад под <b>' + (v.r*100).toFixed(1) + '%</b></p>'
-        + '<p>Квартира <b>' + fmt(v.s0) + ' млн</b> остаётся, растёт ' + (v.g_old*100).toFixed(1) + '%/год</p>'
+        + '<div class="step-title" style="color:#475569;">1. Без покупки (Сводка)</div>'
+        + '<p>Свои деньги (' + fmt(v.equity) + ' млн) идут на вклад под ' + (v.r*100).toFixed(1) + '%.</p>'
+        + '<p>Квартира (' + fmt(v.s0) + ' млн) остаётся и дорожает.</p>'
+        + '<p>Сбережения (' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес) идут на вклад.</p>'
         + '</div>';
 
     var b2 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
-        + '<div class="step-title" style="color:#475569;">2. Каждый месяц откладываете</div>'
-        + '<p><b>' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес</b> → на тот же вклад</p>'
-        + '<p>К году ' + midT + ': вклад ~' + fmt(fv(v.equity, v.r, midT)) + ' млн, сбережения ~' + fmt(fvM(v.savingsMonthly, v.r, midT)) + ' млн</p>'
-        + '</div>';
-
-    var b3 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
-        + '<div class="step-title" style="color:#475569;">3. Квартира дорожает</div>'
-        + '<p>' + fmt(v.s0) + ' × (1+' + (v.g_old*100).toFixed(1) + '%)^' + v.T + ' = <b>' + fmt(s0Final) + ' млн</b></p>'
-        + '</div>';
-
-    var b4 = '<div class="step-block" style="border-left:3px solid #94a3b8;">'
-        + '<div class="step-title" style="color:#475569;">4. Итог через ' + v.T + ' лет</div>'
-        + '<p>Вклад (equity): ' + fmt(v.equity) + ' → <b>' + fmt(equityFinal) + ' млн</b></p>'
-        + '<p>Сбережения за ' + v.T + ' лет: <b>' + fmt(savingsFinal) + ' млн</b></p>'
-        + '<p>Квартира выросла: <b>' + fmt(s0Final) + ' млн</b></p><hr>'
+        + '<div class="step-title" style="color:#475569;">2. Итог через ' + v.T + ' лет</div>'
+        + '<p>Старая квартира: <b>' + fmt(res.yearly[v.T - 1].B_apt_old) + ' млн</b></p>'
+        + '<p>Размер вклада: <b>' + fmt(res.yearly[v.T - 1].B_dep) + ' млн</b></p>'
+        + '<hr>'
         + '<p><b>Итого (Б): ' + fmt(res.WB) + ' млн</b></p>'
-        + '<p style="font-size:0.8rem;color:#64748b;">' + fmt(equityFinal) + ' + ' + fmt(savingsFinal) + ' + ' + fmt(s0Final) + '</p>'
         + '</div>';
 
-    document.getElementById('baseBlock').innerHTML = b1 + b2 + b3 + b4;
+    document.getElementById('baseBlock').innerHTML = b1 + b2;
 }
 
-// ─── Прочие рендеры ───────────────────────────────────────────────────────────
+function renderYearlyTable(res) {
+    var html = '<h3 style="margin:30px 0 12px; font-size:1.2rem; color:#0f172a;">Детализация по годам (млн ₽)</h3>'
+        + '<div style="overflow-x:auto;">'
+        + '<table class="yearly-table">'
+        + '<thead>'
+        + '<tr>'
+        + '<th>Год</th>'
+        + '<th colspan="5" style="border-right: 2px solid #e2e8f0; text-align: center;">Сценарий А (Ипотека)</th>'
+        + '<th colspan="3" style="text-align: center;">Сценарий Б (Вклад)</th>'
+        + '</tr>'
+        + '<tr>'
+        + '<th style="text-align: center;">#</th>'
+        + '<th style="text-align: right;">Недвижимость</th>'
+        + '<th style="text-align: right;">Остаток долга</th>'
+        + '<th style="text-align: right;">Размер вклада</th>'
+        + '<th style="text-align: right;">Платежи банку</th>'
+        + '<th style="border-right: 2px solid #e2e8f0; text-align: right;">Капитал</th>'
+        + '<th style="text-align: right;">Недвижимость</th>'
+        + '<th style="text-align: right;">Размер вклада</th>'
+        + '<th style="text-align: right;">Капитал</th>'
+        + '</tr>'
+        + '</thead><tbody>';
 
-function renderSavingsImpact(res) {
-    var v = res.v;
-    document.getElementById('savingsImpact').innerHTML =
-        '<b>Бюджет на сбережения ' + (v.savingsMonthly*1000).toFixed(0) + ' тыс/мес учтен в обоих сценариях.</b><br>'
-        + 'В сценарии "Вклад" он целиком идёт на вклад и приносит за ' + v.T + ' лет: <b>' + fmt(res.saveFV) + ' млн</b>.<br>'
-        + 'В сценарии "Ипотека" из этого бюджета сначала платятся проценты банку, а на вклад идёт только остаток. '
-        + 'Чистые накопления за вычетом выплаченных процентов: <b>' + fmt(res.savingsDealFV - res.interestFV) + ' млн</b>.<br>'
-        + '<i>(Номинальная сумма процентов без учёта упущенной выгоды по вкладу: ' + fmt(res.totalPercent) + ' млн)</i>';
+    res.yearly.forEach(function(y) {
+        var a_realty = y.A_apt_new + y.A_apt_old;
+        var a_debt = y.A_debt_l1 + y.A_debt_L2;
+        var a_payment = y.A_prin + y.A_int;
+
+        html += '<tr>'
+            + '<td style="text-align: center;"><b>' + y.year + '</b></td>'
+            + '<td>' + fmt(a_realty) + '</td>'
+            + '<td class="' + (a_debt > 0 ? 'negative' : '') + '">' + (a_debt > 0 ? '−' + fmt(a_debt) : '0') + '</td>'
+            + '<td>' + fmt(y.A_dep) + '</td>'
+            + '<td class="' + (a_payment > 0 ? 'negative' : '') + '">'
+            + (a_payment > 0 ? '−' + fmt(a_payment) + '<br><span style="font-size:0.75rem;color:#94a3b8;">(тело ' + fmt(y.A_prin) + ' / % ' + fmt(y.A_int) + ')</span>' : '0')
+            + '</td>'
+            + '<td style="font-weight:700; color:#1e40af; border-right: 2px solid #e2e8f0;">' + fmt(y.A_NW) + '</td>'
+            + '<td>' + fmt(y.B_apt_old) + '</td>'
+            + '<td>' + fmt(y.B_dep) + '</td>'
+            + '<td style="font-weight:700; color:#475569;">' + fmt(y.B_NW) + '</td>'
+            + '</tr>';
+    });
+
+    html += '<tr style="background-color: #f8fafc; font-weight: 700;">'
+        + '<td style="text-align: center;">Итого</td>'
+        + '<td colspan="3" style="text-align: right;">Уплачено процентов за ' + res.v.T + ' лет:</td>'
+        + '<td class="negative">−' + fmt(res.totalPercent) + '</td>'
+        + '<td colspan="4"></td>'
+        + '</tr>';
+
+    html += '</tbody></table></div>';
+    
+    var container = document.getElementById('yearlyTableContainer');
+    if (container) container.innerHTML = html;
 }
 
 function buildTornadoData(v) {
@@ -351,62 +328,28 @@ function buildTornadoData(v) {
 
 function updateAffordabilityCheck(res) {
     var v = res.v;
-    var maxMonthlyPayment = v.savingsMonthly;  // максимальный ежемесячный платеж = доходу
-    var maxAnnualPercent = maxMonthlyPayment * 12;  // максимальный годовой процент
-
-    // Рассчитаем максимальные кредиты при текущих ставках
-    var maxL1 = Math.min(25, maxAnnualPercent / v.i1);  // ограничено ползунком
-    var remainingPercent = Math.max(0, maxAnnualPercent - maxL1 * v.i1);
-    var maxL2 = remainingPercent / v.i2;
-
-    // C_max + repair = equity + maxL1 + maxL2  →  p0_max = (equity + maxL1 + maxL2 - repair) / (1 - d)
-    var maxP0 = (v.equity + maxL1 + maxL2 - v.repair) / (1 - v.discount / 100);
-
-    // Текущий расчет: полный ежемесячный процент = льготный + дорогой
-    var currentMonthlyPercent = (res.I1 + res.I2) / 12;
+    var currentMonthlyPercent = res.pmt1 + res.pmt2;
     var isAffordable = currentMonthlyPercent <= v.savingsMonthly;
     
-    // Подсветка проблемных ползунков красным
-    var problemSliders = [];
-    if (v.l1 > maxL1) problemSliders.push('l1');
-    if (res.L2 > maxL2) problemSliders.push('p0', 'discount', 'equity', 'repair');
-    
-    // Сброс стилей всех ползунков
-    ['p0', 'discount', 'equity', 'l1', 'repair'].forEach(function(id) {
-        var slider = document.getElementById(id);
-        if (slider) {
-            if (problemSliders.indexOf(id) >= 0) {
-                slider.style.accentColor = '#dc3545';
-                slider.parentElement.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
-                slider.parentElement.style.borderRadius = '6px';
-                slider.parentElement.style.padding = '8px';
-            } else {
-                slider.style.accentColor = '';
-                slider.parentElement.style.backgroundColor = '';
-                slider.parentElement.style.borderRadius = '';
-                slider.parentElement.style.padding = '';
-            }
-        }
-    });
-    
     var resultDiv = document.getElementById('affordabilityResult');
+    if (!resultDiv) return;
+
     if (isAffordable) {
         resultDiv.innerHTML = 
             '<div style="color: #28a745; font-weight: bold;">✅ Кредит доступен</div>' +
             '<div style="font-size: 0.9em; margin-top: 5px;">' +
             'Ежемесячный платеж: <b>' + (currentMonthlyPercent * 1000).toFixed(0) + ' тыс</b> из ' + (v.savingsMonthly * 1000).toFixed(0) + ' тыс доступных<br>' +
-            'Запас: <b>' + ((v.savingsMonthly - currentMonthlyPercent) * 1000).toFixed(0) + ' тыс/мес</b>' +
+            'В запас (на вклад): <b>' + ((v.savingsMonthly - currentMonthlyPercent) * 1000).toFixed(0) + ' тыс/мес</b>' +
             '</div>';
         resultDiv.style.backgroundColor = '#d4edda';
         resultDiv.style.border = '1px solid #c3e6cb';
     } else {
         var deficit = currentMonthlyPercent - v.savingsMonthly;
         resultDiv.innerHTML = 
-            '<div style="color: #dc3545; font-weight: bold;">❌ Кредит недоступен</div>' +
+            '<div style="color: #dc3545; font-weight: bold;">❌ Кредит недоступен (вклад будет проедаться)</div>' +
             '<div style="font-size: 0.9em; margin-top: 5px;">' +
-            'Нужно: <b>' + (currentMonthlyPercent * 1000).toFixed(0) + ' тыс/мес</b>, есть: <b>' + (v.savingsMonthly * 1000).toFixed(0) + ' тыс</b><br>' +
-            'Дефицит: <b>' + (deficit * 1000).toFixed(0) + ' тыс/мес</b><br>' +
-            '<div style="margin-top: 8px; color: #6c757d;">💡 Максимальная квартира при текущем доходе: <b>' + maxP0.toFixed(1) + ' млн</b></div>' +
+            'Платёж: <b>' + (currentMonthlyPercent * 1000).toFixed(0) + ' тыс/мес</b>, доход: <b>' + (v.savingsMonthly * 1000).toFixed(0) + ' тыс</b><br>' +
+            'Дефицит: <b>' + (deficit * 1000).toFixed(0) + ' тыс/мес</b>' +
             '</div>';
         resultDiv.style.backgroundColor = '#f8d7da';
         resultDiv.style.border = '1px solid #f5c6cb';
@@ -417,10 +360,12 @@ function updateUI() {
     // Физическое ограничение: t1 < T (нельзя продать квартиру после горизонта)
     var t1El = document.getElementById('t1');
     var TEl  = document.getElementById('T');
-    t1El.max = +TEl.value - 1;
-    if (+t1El.value >= +TEl.value) t1El.value = +TEl.value - 1;
-    TEl.min  = +t1El.value + 1;
-    if (+TEl.value <= +t1El.value) TEl.value = +t1El.value + 1;
+    if (t1El && TEl) {
+        t1El.max = +TEl.value - 1;
+        if (+t1El.value >= +TEl.value) t1El.value = +TEl.value - 1;
+        TEl.min  = +t1El.value + 1;
+        if (+TEl.value <= +t1El.value) TEl.value = +t1El.value + 1;
+    }
 
     var v   = getValues();
     var res = Calc.calculate(v);
@@ -436,28 +381,33 @@ function updateUI() {
     renderNPVExplainer(res);
     renderIntermediate(res);
     renderBaseIntermediate(res);
-    renderSavingsImpact(res);
+    renderYearlyTable(res);
 
     var warning = document.getElementById('warningMessage');
-    if (res.L2 > 0 && Calc.fv(v.s0, v.g_old, v.t1) < res.L2) {
-        warning.style.display = 'block';
-        warning.textContent = '⚠ Выручка от продажи квартиры через ' + v.t1 + ' лет ('
-            + fmt(Calc.fv(v.s0, v.g_old, v.t1)) + ' млн) < долга ('
-            + fmt(res.L2) + ' млн). Нехватка учтена через повышенную ставку.';
-    } else {
-        warning.style.display = 'none';
+    if (warning) {
+        if (res.L2 > 0 && Calc.fv(v.s0, v.g_old, v.t1) < res.L2) {
+            warning.style.display = 'block';
+            warning.textContent = '⚠ Выручка от продажи квартиры через ' + v.t1 + ' лет ('
+                + fmt(Calc.fv(v.s0, v.g_old, v.t1)) + ' млн) < остатка рыночного долга. Нехватка учтена в отрицательном балансе вклада.';
+        } else {
+            warning.style.display = 'none';
+        }
     }
 
-    Charts.updateCharts(res, buildTornadoData(v));
+    if (window.Charts) {
+        Charts.updateCharts(res, buildTornadoData(v));
+    }
 }
 
 INPUT_IDS.forEach(function(id) {
-    document.getElementById(id).addEventListener('input', updateUI);
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', updateUI);
 });
-document.getElementById('repayL1Early').addEventListener('change', updateUI);
+var repayCheck = document.getElementById('repayL1Early');
+if (repayCheck) repayCheck.addEventListener('change', updateUI);
 
 initModal();
-Charts.initCharts();
+if (window.Charts) Charts.initCharts();
 updateUI();
 
 })();
