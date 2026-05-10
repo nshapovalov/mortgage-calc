@@ -110,14 +110,20 @@ function updateInvUI() {
         '<hr><p><b>Итог на руках: ' + fmt(res.W1) + ' млн ₽</b></p></div>';
 
     // Deal block
+    var dep2 = res.yearly[v.T - 1] ? res.yearly[v.T - 1].dep2 : 0;
+    var dep2Str = dep2 >= 0 
+        ? '<p>Накопления (сдача от платежей): <b>+' + fmt(dep2) + ' млн</b></p>' 
+        : '<p>Нехватка сбережений (долг): <b class="negative">' + fmt(dep2) + ' млн</b></p>';
+
     document.getElementById('inv_dealBlock').innerHTML = 
         '<div class="step-block"><div class="step-title">Продажа через ' + v.T + ' лет</div>' +
         '<p>Цена продажи: <b>' + fmt(res.sellPrice) + ' млн</b></p>' +
-        '<p>Остаток долга: <b class="negative">−' + fmt(res.yearly[v.T - 1].debt2) + ' млн</b></p>' +
+        '<p>Остаток долга: <b class="negative">−' + fmt(res.yearly[v.T - 1] ? res.yearly[v.T - 1].debt2 : 0) + ' млн</b></p>' +
         '<p>Налог с прибыли (13% с разницы ' + fmt(res.sellPrice) + ' и ' + fmt(v.price) + '): <b class="negative">−' + fmt(res.taxSell) + ' млн</b></p>' +
-        '<p>Уплачено % банку за срок: <b class="negative">−' + fmt(res.total_interest_paid) + ' млн</b></p>' +
-        '<p>Накопления из остатка сбережений: <b>+' + fmt(res.yearly[v.T - 1].dep2) + ' млн</b></p>' +
-        '<hr><p><b>Итог на руках: ' + fmt(res.W2) + ' млн ₽</b></p></div>';
+        dep2Str +
+        '<hr>' +
+        '<p style="font-size: 0.82rem; color: #64748b; margin-bottom: 6px;">Справочно: за этот срок банку уплачено процентов на ' + fmt(res.total_interest_paid) + ' млн ₽</p>' +
+        '<p><b>Итог на руках: ' + fmt(res.W2) + ' млн ₽</b></p></div>';
 
     // Chart
     var years = Array.from({length: v.T + 1}, function(_,i){return i;});

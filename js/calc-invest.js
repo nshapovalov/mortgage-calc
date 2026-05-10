@@ -1,8 +1,9 @@
 (function(global) {
 
 function calculateInvest(v) {
-    var L = v.price - v.equity;
-    if (L < 0) L = 0;
+    var equity_for_apt = Math.min(v.equity, v.price);
+    var L = v.price - equity_for_apt;
+    
     var r_m = v.rateMortgage / 12;
     var N = v.loanTerm * 12;
     var pmt = L > 0 ? L * r_m / (1 - Math.pow(1 + r_m, -N)) : 0;
@@ -12,7 +13,7 @@ function calculateInvest(v) {
     var dep1 = v.equity;
     var tax1_total = 0;
     
-    var dep2 = 0; 
+    var dep2 = v.equity - equity_for_apt; 
     var debt2 = L;
     var tax2_total = 0;
     
@@ -25,25 +26,26 @@ function calculateInvest(v) {
     var months = v.T * 12;
     for (var m = 1; m <= months; m++) {
         // Сценарий 1: Вклад
-        var int1 = dep1 > 0 ? dep1 * r_dep_m : 0;
-        cur_year_int1 += int1;
-        dep1 += int1;
-        dep1 += v.savings;
+        var int1 = dep1 * r_dep_m;
+        if (int1 > 0) cur_year_int1 += int1;
+        dep1 += int1 + v.savings;
         
         // Сценарий 2: Ипотека
-        var int2 = dep2 > 0 ? dep2 * r_dep_m : 0;
-        cur_year_int2 += int2;
+        var int2 = dep2 * r_dep_m;
+        if (int2 > 0) cur_year_int2 += int2;
         dep2 += int2;
         
-        var m_int = debt2 * r_m;
-        var m_prin = pmt - m_int;
+        var actual_pmt = 0;
         if (debt2 > 0) {
+            var m_int = debt2 * r_m;
+            actual_pmt = Math.min(pmt, debt2 + m_int);
+            var m_prin = actual_pmt - m_int;
             debt2 -= m_prin;
             total_interest_paid += m_int;
         }
         
         // Остаток сбережений идет на вклад (или дефицит вычитается)
-        dep2 += v.savings - pmt;
+        dep2 += v.savings - actual_pmt;
         
         // Налоги на вклады (раз в год)
         if (m % 12 === 0) {
@@ -84,16 +86,47 @@ function calculateInvest(v) {
     var W2 = sellPrice - taxSell - debt2 + dep2;
     
     var diff = W2 - W1;
-    var npvDirect = diff / Math.pow(1 + v.depRate, v.T);
+    var effective_discount = Math.pow(1 + r_dep_m, months);
+    var npvDirect = diff / effective_discount;
     
-    // IRR Calculation (Simplified)
-    // CF1: -equity, +W1 at T -> irr1 = (W1 / equity)^(1/T) - 1
-    var irr1 = Math.pow(W1 / v.equity, 1 / v.T) - 1;
-    // CF2: -equity, -savings monthly..., +W2 at T. Since savings are identical in both, we can compare overall IRR.
-    // For pure investment perspective, what's the IRR of CF2?
-    // Let's use simple geometric return on equity + accumulated savings.
-    var total_invested = v.equity + v.savings * months;
-    var irr2 = Math.pow(W2 / total_invested, 1 / v.T) - 1; // rough approx for annual yield
+    // Exact IRR Calculation
+    function calcMonthlyIRR(W) {
+        var cf = new Array(months + 1).fill(0);
+        cf[0] = -v.equity;
+        for (var m = 1; m <= months; m++) {
+            cf[m] = -v.savings;
+        }
+        cf[months] += W;
+        
+        // Bisection method
+        var low = -0.99;
+        var high = 10.0;
+        
+        var sum = 0;
+        for(var i=0; i<=months; i++) sum += cf[i];
+        if (sum < 0) {
+            high = 0;
+        } else {
+            low = 0;
+        }
+
+        for (var i = 0; i < 100; i++) {
+            var mid = (low + high) / 2;
+            var npv = 0;
+            for (var t = 0; t <= months; t++) {
+                npv += cf[t] / Math.pow(1 + mid, t);
+            }
+            if (npv > 0) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        return Math.pow(1 + (low + high)/2, 12) - 1;
+    }
+    
+    var irr1 = calcMonthlyIRR(W1);
+    var irr2 = calcMonthlyIRR(W2);
     
     return {
         pmt: pmt,

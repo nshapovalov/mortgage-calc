@@ -66,7 +66,7 @@ describe('calculateInvest', () => {
     test('npvDirect is W2 - W1 discounted', () => {
         const params = defaultInvestParams();
         const res = calculateInvest(params);
-        const expectedNpv = (res.W2 - res.W1) / Math.pow(1 + params.depRate, params.T);
+        const expectedNpv = (res.W2 - res.W1) / Math.pow(1 + params.depRate / 12, params.T * 12);
         expect(res.npvDirect).toBeCloseTo(expectedNpv, 4);
     });
 
@@ -77,5 +77,28 @@ describe('calculateInvest', () => {
         params.cbRate = 0.05; // limit 50k
         const res = calculateInvest(params);
         expect(res.tax1_total).toBeGreaterThan(0);
+    });
+
+    test('Edge case: loan term is shorter than investment horizon', () => {
+        const params = defaultInvestParams();
+        params.loanTerm = 2; // Pay off in 2 years
+        params.T = 5; // Horizon is 5 years
+        const res = calculateInvest(params);
+        // Debt should be strictly 0 at the end, not negative
+        expect(res.yearly[4].debt2).toBeCloseTo(0, 4);
+        // Pmt should stop subtracting from dep2 after year 2
+        expect(res.W2).toBeGreaterThan(0); 
+    });
+
+    test('Edge case: equity is greater than apartment price', () => {
+        const params = defaultInvestParams();
+        params.equity = 20000000;
+        params.price = 15000000;
+        const res = calculateInvest(params);
+        // Should take no mortgage
+        expect(res.pmt).toBe(0);
+        // Remaining 5M should go to deposit
+        expect(res.yearly[0].debt2).toBe(0);
+        expect(res.yearly[0].dep2).toBeGreaterThan(5000000); 
     });
 });
