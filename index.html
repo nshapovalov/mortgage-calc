@@ -24,7 +24,13 @@
         Двигайте ползунки — всё пересчитается.
     </div>
 
-    <div class="dashboard">
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-classic">Своя квартира</button>
+        <button class="tab-btn" data-tab="tab-invest">Инвестиция (Переуступка)</button>
+    </div>
+
+    <div id="tab-classic" class="tab-content active">
+        <div class="dashboard">
 
         <!-- Левая панель: параметры -->
         <div class="controls">
@@ -185,10 +191,120 @@
 
         </div>
     </div>
+    </div> <!-- end tab-classic -->
+
+    <div id="tab-invest" class="tab-content">
+        <div class="dashboard">
+            <!-- Левая панель: параметры -->
+            <div class="controls">
+                <h3 style="margin:0 0 14px;">Параметры инвестиции</h3>
+
+                <div class="control-group">
+                    <label>Свои средства (Взнос / Депозит) <span class="value-display" id="inv_equityVal">3 млн</span></label>
+                    <input type="range" id="inv_equity" min="1" max="10" value="3" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label>Ежемесячные сбережения <span class="value-display" id="inv_savingsVal">70 тыс</span></label>
+                    <input type="range" id="inv_savings" min="10" max="300" value="70" step="5">
+                </div>
+                <div class="control-group">
+                    <label>Горизонт (до сдачи и продажи) <span class="value-display" id="inv_TVal">3 лет</span></label>
+                    <input type="range" id="inv_T" min="1" max="5" value="3" step="1">
+                </div>
+                
+                <hr>
+                <h4 style="margin: 0 0 10px; color: #495057;">Условия Ипотеки (Сценарий 2)</h4>
+                
+                <div class="control-group">
+                    <label>Стоимость новостройки <span class="value-display" id="inv_priceVal">15 млн</span></label>
+                    <input type="range" id="inv_price" min="5" max="40" value="15" step="0.5">
+                </div>
+                <div class="control-group">
+                    <label>Срок ипотеки <span class="value-display" id="inv_loanTermVal">30 лет</span></label>
+                    <input type="range" id="inv_loanTerm" min="10" max="30" value="30" step="1">
+                </div>
+                <div class="control-group">
+                    <label>Ставка по ипотеке <span class="value-display" id="inv_rateMortgageVal">6.0%</span></label>
+                    <input type="range" id="inv_rateMortgage" min="2" max="25" value="6" step="0.5">
+                </div>
+                <div class="control-group">
+                    <label>
+                        Рост стоимости квартиры / год
+                        <button class="info-btn" data-tip="inv_growth">?</button>
+                        <span class="value-display" id="inv_growthVal">8.0%</span>
+                    </label>
+                    <input type="range" id="inv_growth" min="0" max="30" value="8" step="0.5">
+                </div>
+
+                <hr>
+                <h4 style="margin: 0 0 10px; color: #495057;">Условия Вклада (Сценарий 1)</h4>
+
+                <div class="control-group">
+                    <label>
+                        Средняя ставка по вкладу
+                        <button class="info-btn" data-tip="inv_depRate">?</button>
+                        <span class="value-display" id="inv_depRateVal">12.0%</span>
+                    </label>
+                    <input type="range" id="inv_depRate" min="5" max="25" value="12" step="0.5">
+                </div>
+                <div class="control-group">
+                    <label>Ключевая ставка ЦБ (для налога) <span class="value-display" id="inv_cbRateVal">14.5%</span></label>
+                    <input type="range" id="inv_cbRate" min="5" max="25" value="14.5" step="0.5">
+                </div>
+
+                <hr>
+                <div class="assumptions-box" style="border-left-color: #3b82f6; background: #eff6ff; color: #1e3a8a;">
+                    <h4 style="color: #1d4ed8;">Налоги в расчётах</h4>
+                    <p style="font-size:0.8rem; margin:0 0 8px; color:#334155;">Все итоговые суммы указаны «чистыми» (после уплаты налогов).</p>
+                    <ul style="padding-left:18px; margin:0; line-height:1.6; font-size:0.85rem; color:#334155;">
+                        <li style="margin-bottom:6px;"><b>Вклад:</b> Учтён налог 13% с процентов, превышающих необлагаемую базу (1 млн ₽ × Ключевую ставку).</li>
+                        <li><b>Переуступка:</b> Учтён налог 13% с разницы между продажной ценой и затратами на приобретение (первоначальный взнос + сумма кредита). Вычет в 1 млн ₽ не применяется при переуступке права.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Правая панель: результаты -->
+            <div class="results-panel">
+                <div class="stats" id="inv_statsContainer"></div>
+                <div class="npv-explainer" id="inv_npvExplainer"></div>
+
+                <h3 style="margin:0 0 8px; font-size:1rem; color:#475569;">
+                    Вариант 1 — Банковский вклад
+                </h3>
+                <div class="intermediate" id="inv_baseBlock"></div>
+
+                <h3 style="margin:16px 0 8px; font-size:1rem; color:#1e40af;">
+                    Вариант 2 — Ипотека + Переуступка
+                </h3>
+                <div class="intermediate" id="inv_dealBlock"></div>
+                
+                <div class="chart-row" style="margin-top: 20px;">
+                    <div class="chart-box">
+                        <h4 style="margin:0 0 6px;">Рост капитала по годам</h4>
+                        <canvas id="inv_chartNetWorth" width="400" height="200"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> <!-- end tab-invest -->
+
 </div>
 
 <script src="js/calc.js"></script>
+<script src="js/calc-invest.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/ui-invest.js"></script>
+<script>
+    // Простая логика вкладок
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            document.getElementById(this.dataset.tab).classList.add('active');
+        });
+    });
+</script>
 </body>
 </html>

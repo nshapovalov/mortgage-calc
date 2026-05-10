@@ -1,5 +1,7 @@
 const Calc = require('../js/calc.js');
+const CalcInvest = require('../js/calc-invest.js');
 const { calculate, computeSensNPV, fv, fvAnnuityMonthly } = Calc;
+const { calculateInvest } = CalcInvest;
 
 function defaultParams() {
     return {
@@ -36,5 +38,44 @@ describe('calculate with annuity', () => {
         expect(res.pmt1).toBeGreaterThan(0);
         // Should pay principal too
         expect(res.totalPrin).toBeGreaterThan(0);
+    });
+});
+
+describe('calculateInvest', () => {
+    function defaultInvestParams() {
+        return {
+            equity: 3000000,
+            savings: 70000,
+            T: 3,
+            price: 15000000,
+            loanTerm: 30,
+            rateMortgage: 0.06,
+            growth: 0.08,
+            depRate: 0.12,
+            cbRate: 0.145
+        };
+    }
+
+    test('calculateInvest returns W1 and W2', () => {
+        const res = calculateInvest(defaultInvestParams());
+        expect(res.W1).toBeGreaterThan(0);
+        expect(res.W2).toBeGreaterThan(0);
+        expect(res.yearly.length).toBe(defaultInvestParams().T);
+    });
+
+    test('npvDirect is W2 - W1 discounted', () => {
+        const params = defaultInvestParams();
+        const res = calculateInvest(params);
+        const expectedNpv = (res.W2 - res.W1) / Math.pow(1 + params.depRate, params.T);
+        expect(res.npvDirect).toBeCloseTo(expectedNpv, 4);
+    });
+
+    test('Taxes are calculated for deposit if interest exceeds limit', () => {
+        const params = defaultInvestParams();
+        params.equity = 10000000; // Big deposit
+        params.depRate = 0.20; // 20%
+        params.cbRate = 0.05; // limit 50k
+        const res = calculateInvest(params);
+        expect(res.tax1_total).toBeGreaterThan(0);
     });
 });
