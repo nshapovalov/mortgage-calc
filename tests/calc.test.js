@@ -101,4 +101,22 @@ describe('calculateInvest', () => {
         expect(res.yearly[0].debt2).toBe(0);
         expect(res.yearly[0].dep2).toBeGreaterThan(5000000); 
     });
+
+    test('Edge case: 0% mortgage rate', () => {
+        const params = defaultInvestParams();
+        params.rateMortgage = 0;
+        const res = calculateInvest(params);
+        const expectedPmt = (params.price - params.equity) / (params.loanTerm * 12);
+        expect(res.pmt).toBeCloseTo(expectedPmt, 4);
+    });
+
+    test('Edge case: 0 months horizon', () => {
+        const params = defaultInvestParams();
+        params.T = 0;
+        const res = calculateInvest(params);
+        expect(res.irr1).toBe(0);
+        expect(res.irr2).toBe(0);
+        expect(res.W1).toBeCloseTo(params.equity, 4);
+        expect(res.W2).toBeCloseTo(params.equity, 4);
+    });
 });

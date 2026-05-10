@@ -6,7 +6,10 @@ function calculateInvest(v) {
     
     var r_m = v.rateMortgage / 12;
     var N = v.loanTerm * 12;
-    var pmt = L > 0 ? L * r_m / (1 - Math.pow(1 + r_m, -N)) : 0;
+    var pmt = 0;
+    if (L > 0) {
+        pmt = r_m > 0 ? L * r_m / (1 - Math.pow(1 + r_m, -N)) : L / N;
+    }
     
     var r_dep_m = v.depRate / 12;
     
@@ -36,12 +39,13 @@ function calculateInvest(v) {
         dep2 += int2;
         
         var actual_pmt = 0;
-        if (debt2 > 0) {
+        if (debt2 > 0.01) {
             var m_int = debt2 * r_m;
             actual_pmt = Math.min(pmt, debt2 + m_int);
             var m_prin = actual_pmt - m_int;
             debt2 -= m_prin;
             total_interest_paid += m_int;
+            if (debt2 < 0.01) debt2 = 0; // snap to 0 to avoid floating point micro-debts
         }
         
         // Остаток сбережений идет на вклад (или дефицит вычитается)
@@ -91,6 +95,8 @@ function calculateInvest(v) {
     
     // Exact IRR Calculation
     function calcMonthlyIRR(W) {
+        if (months === 0) return 0; // Edge case: 0 months horizon
+        
         var cf = new Array(months + 1).fill(0);
         cf[0] = -v.equity;
         for (var m = 1; m <= months; m++) {
@@ -99,7 +105,7 @@ function calculateInvest(v) {
         cf[months] += W;
         
         // Bisection method
-        var low = -0.99;
+        var low = -0.9999;
         var high = 10.0;
         
         var sum = 0;
