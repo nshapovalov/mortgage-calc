@@ -102,11 +102,15 @@ function updateInvUI() {
     }
 
     // Base block
+    var tax1Str = '<div style="color: #b91c1c; background: #fee2e2; padding: 6px 10px; border-radius: 6px; margin: 8px 0;">' +
+                  '<b>Суммарный налог на прибыль по вкладу: ' + fmt(res.tax1_total) + ' млн ₽</b>' +
+                  '</div>';
+
     document.getElementById('inv_baseBlock').innerHTML = 
         '<div class="step-block"><div class="step-title">Рост депозита</div>' +
         '<p>Начальный взнос: <b>' + fmt(v.equity) + ' млн</b></p>' +
         '<p>Пополнения: <b>' + (v.savings / 1000).toFixed(0) + ' тыс / мес</b></p>' +
-        '<p>Налог на проценты за ' + v.T + ' лет: <b class="negative">−' + fmt(res.tax1_total) + ' млн</b></p>' +
+        tax1Str +
         '<hr><p><b>Итог на руках: ' + fmt(res.W1) + ' млн ₽</b></p></div>';
 
     // Deal block
@@ -115,12 +119,19 @@ function updateInvUI() {
         ? '<p>Накопления (сдача от платежей): <b>+' + fmt(dep2) + ' млн</b></p>' 
         : '<p>Нехватка сбережений (долг): <b class="negative">' + fmt(dep2) + ' млн</b></p>';
 
+    var total_tax2 = res.taxSell + res.tax2_total;
+    var tax2Str = '<div style="color: #b91c1c; background: #fee2e2; padding: 6px 10px; border-radius: 6px; margin: 8px 0;">' +
+                  '<b>Суммарные налоги: ' + fmt(total_tax2) + ' млн ₽</b>' +
+                  '<div style="font-size: 0.8rem; margin-top: 2px;">(Налог с продажи ' + fmt(res.taxSell) + ' млн' +
+                  (res.tax2_total > 0 ? ' + налог по вкладу ' + fmt(res.tax2_total) + ' млн' : '') +
+                  ')</div></div>';
+
     document.getElementById('inv_dealBlock').innerHTML = 
         '<div class="step-block"><div class="step-title">Продажа через ' + v.T + ' лет</div>' +
         '<p>Цена продажи: <b>' + fmt(res.sellPrice) + ' млн</b></p>' +
         '<p>Остаток долга: <b class="negative">−' + fmt(res.yearly[v.T - 1] ? res.yearly[v.T - 1].debt2 : 0) + ' млн</b></p>' +
-        '<p>Налог с прибыли (13% с разницы ' + fmt(res.sellPrice) + ' и ' + fmt(v.price) + '): <b class="negative">−' + fmt(res.taxSell) + ' млн</b></p>' +
         dep2Str +
+        tax2Str +
         '<hr>' +
         '<p style="font-size: 0.82rem; color: #64748b; margin-bottom: 6px;">Справочно: за этот срок банку уплачено процентов на ' + fmt(res.total_interest_paid) + ' млн ₽</p>' +
         '<p><b>Итог на руках: ' + fmt(res.W2) + ' млн ₽</b></p></div>';
